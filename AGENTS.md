@@ -1,6 +1,6 @@
-# figma-make-app
+# SithGuy Hobbyshop
 
-React + Vite + Tailwind CSS project running inside Figma Make.
+React + Vite + Tailwind CSS e-commerce application.
 
 ## Development Server
 
