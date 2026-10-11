@@ -1,7 +1,5 @@
 import { C } from "@/lib/theme";
-
-// Define an actual value for logoSrc (replace with your logo path or URL if different)
-const logoSrc = "/logo.png"; 
+import logoSrc from "@/imports/SITHGUY HOBBYSHOP.png";
 
 export function LoadingScreen() {
   return (

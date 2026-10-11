@@ -2,8 +2,7 @@ import React from "react";
 import { font, af } from "@/lib/theme";
 import { Btn } from "@/components/ui/Btn";
 import { useWindowWidth } from "@/hooks/useWindowWidth";
-
-const logoSrc = "/logo.png";
+import logoSrc from "@/imports/SITHGUY HOBBYSHOP.png";
 
 export function HomeLanding({ onShopNow }: { onShopNow: () => void }) {
   const w = useWindowWidth();

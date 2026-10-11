@@ -1,4 +1,4 @@
-const logoSrc = "/logo.png";
+import logoSrc from "@/imports/SITHGUY HOBBYSHOP.png";
 
 export function Logo({ size = "md" }: { size?: "sm" | "md" | "lg" }) {
   const h = { sm: 64, md: 90, lg: 130 }[size];
