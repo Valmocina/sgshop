@@ -53,6 +53,7 @@ create policy "products_delete_admin" on public.products for delete to authentic
 create table public.orders (
   id uuid primary key default gen_random_uuid(),
   customer_id uuid references auth.users(id) on delete set null,
+  -- snapshot of customer info at order time (for invoicing/shipping); NOT live profile data
   customer_name text not null default 'Guest',
   customer_email text,
   customer_phone text,
@@ -72,7 +73,7 @@ create table public.orders (
   supplier_ref text,
   admin_notes text,
   ordered_at timestamptz,
-  delivery_date text,
+  delivery_date date,
   delivery_time_slot text,
   courier_name text,
   tracking_number text,
