@@ -1,0 +1,10 @@
+{
+  "description": "This web application streamlines the process of creating and managing websites, offering intuitive design tools and templates for users of all skill levels.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
