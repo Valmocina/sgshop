@@ -120,7 +120,7 @@ function OrderCard({ order, onSave, busy }: {
         <div style={{ background: `${A.gold}15`, border: `1px solid ${A.gold}44`, borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
             <span style={{ ...af(12, 700), color: A.gold, textTransform: "uppercase" }}>
-              📅 Customer Scheduled Delivery: {new Date(order.delivery_date).toLocaleDateString("en-PH", { dateStyle: "full" })}
+              📅 Customer Scheduled White-Glove Supervised Delivery: {new Date(order.delivery_date).toLocaleDateString("en-PH", { dateStyle: "full" })}
             </span>
             <span style={{ ...af(12, 600), color: A.text }}>
               Slot: {order.delivery_time_slot || "Standard Daytime"}
@@ -182,7 +182,7 @@ function OrderCard({ order, onSave, busy }: {
             {order.fulfillment_status === "arrived" && order.delivery_date && (
               <button disabled={busy} onClick={() => onSave(order.id, { ...details(), fulfillment_status: "delivered" }, "Marked as delivered")}
                 style={{ padding: "9px 16px", background: `${A.green}20`, border: `1px solid ${A.green}77`, borderRadius: 8, ...af(13, 700), color: A.green, cursor: "pointer" }}>
-                Mark Delivered by Courier ✓
+                Mark White-Glove Delivered by Supervisor & Courier ✓
               </button>
             )}
             <button disabled={busy || !dirty} onClick={() => onSave(order.id, { ...details(), fulfillment_status: fulfillment }, "Order updated")}

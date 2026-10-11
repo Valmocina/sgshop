@@ -78,45 +78,48 @@ function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => v
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
             <span style={{ fontSize: 16 }}>{isDelivered ? "✓" : "🎉"}</span>
             <strong style={{ ...font(12, 800, 1), color: isDelivered ? "#22c55e" : C.gold, textTransform: "uppercase" }}>
-              {isDelivered ? "Order Delivered Successfully" : "Item Arrival Confirmed in the Philippines"}
+              {isDelivered ? "White-Glove Delivery Completed" : "Item Arrival Confirmed in the Philippines"}
             </strong>
           </div>
           <p style={{ ...body, fontSize: 12, color: C.text, marginBottom: 10 }}>
             {isDelivered
-              ? "Your item was successfully delivered by our courier service."
-              : "Your collectible has arrived at our local facility and cleared customs! You can now select your preferred delivery date."}
+              ? "Your life-size model was successfully delivered and handed over by our staff-supervised team."
+              : "Your life-size model has arrived locally and cleared customs! Please choose your preferred date for Specialized White-Glove Supervised Delivery."}
           </p>
 
           {order.delivery_date && !isScheduling ? (
-            <div style={{ background: C.surface, borderRadius: 8, padding: "10px 14px", border: `1px solid ${C.border}` }}>
+            <div style={{ background: C.surface, borderRadius: 8, padding: "12px 14px", border: `1px solid ${C.border}` }}>
               <p style={{ ...font(11, 700, 1), color: "#22c55e", textTransform: "uppercase", marginBottom: 4 }}>
-                📅 Scheduled Delivery Date
+                📅 Specialized White-Glove Supervised Delivery Confirmed
               </p>
               <p style={{ ...body, fontSize: 13, color: C.text }}>
-                <strong>Date:</strong> {new Date(order.delivery_date).toLocaleDateString("en-PH", { dateStyle: "full" })}
+                <strong>Scheduled Date:</strong> {new Date(order.delivery_date).toLocaleDateString("en-PH", { dateStyle: "full" })}
               </p>
               <p style={{ ...body, fontSize: 13, color: C.text }}>
-                <strong>Time Slot:</strong> {order.delivery_time_slot || "Morning (9:00 AM - 1:00 PM)"}
+                <strong>Time Window:</strong> {order.delivery_time_slot || "Morning (9:00 AM - 1:00 PM)"}
               </p>
-              {order.courier_name && (
-                <p style={{ ...body, fontSize: 12, color: C.textMuted, marginTop: 4 }}>
-                  <strong>Courier:</strong> {order.courier_name} {order.tracking_number ? `(#${order.tracking_number})` : ""}
-                </p>
-              )}
+              <p style={{ ...body, fontSize: 12, color: C.textMuted, marginTop: 4 }}>
+                <strong>Staff Supervisor & Transport:</strong> {order.courier_name || "SithGuy Operations Supervisor & Specialized Transport"} {order.tracking_number ? `(#${order.tracking_number})` : ""}
+              </p>
               {!isDelivered && (
                 <button onClick={() => setIsScheduling(true)} style={{ marginTop: 8, background: "none", border: "none", color: C.gold, cursor: "pointer", ...font(11, 700, 1), textTransform: "uppercase", padding: 0 }}>
-                  Reschedule Delivery ✎
+                  Reschedule White-Glove Delivery ✎
                 </button>
               )}
             </div>
           ) : !isDelivered ? (
             <div style={{ background: C.surface, borderRadius: 8, padding: "12px 14px", border: `1px solid ${C.border}` }}>
-              <p style={{ ...font(11, 700, 1), color: C.gold, textTransform: "uppercase", marginBottom: 8 }}>
-                Select Delivery Date & Time
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <p style={{ ...font(11, 700, 1), color: C.gold, textTransform: "uppercase" }}>
+                  Schedule White-Glove Supervised Delivery
+                </p>
+              </div>
+              <p style={{ ...body, fontSize: 11, color: C.textMuted, marginBottom: 10 }}>
+                Due to the monumental size and fragility of life-size models, transport is strictly accompanied by a SithGuy staff supervisor.
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 10 }}>
                 <div>
-                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.textMuted, marginBottom: 4, textTransform: "uppercase" }}>Preferred Date</label>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.textMuted, marginBottom: 4, textTransform: "uppercase" }}>Preferred Delivery Date</label>
                   <input
                     type="date"
                     value={selectedDate}
@@ -126,7 +129,7 @@ function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => v
                   />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.textMuted, marginBottom: 4, textTransform: "uppercase" }}>Time Slot</label>
+                  <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: C.textMuted, marginBottom: 4, textTransform: "uppercase" }}>Delivery Time Slot</label>
                   <select
                     value={selectedSlot}
                     onChange={e => setSelectedSlot(e.target.value)}
@@ -153,7 +156,7 @@ function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => v
                     opacity: selectedDate ? 1 : 0.6,
                   }}
                 >
-                  {savingSchedule ? "Saving..." : "Confirm Delivery Date"}
+                  {savingSchedule ? "Saving..." : "Confirm White-Glove Delivery"}
                 </button>
                 {isScheduling && (
                   <button onClick={() => setIsScheduling(false)} style={{ padding: "7px 12px", background: "none", border: `1px solid ${C.border}`, borderRadius: 6, color: C.textMuted, fontSize: 12, cursor: "pointer" }}>

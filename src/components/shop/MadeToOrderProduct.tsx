@@ -117,15 +117,15 @@ export function MadeToOrderProduct({ product, onCheckout }: {
             <span style={{ color: balance > 0 ? C.text : C.textDim, fontWeight: 700 }}>{peso(balance)}</span>
           </div>
 
-          <div style={{ ...body(12, C.textDim), background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", marginBottom: 18 }}>
-            <span style={{ color: C.text, fontWeight: 700 }}>Delivery: </span>
-            Life-size figures are delivered by specialised white-glove freight, not a standard courier. We'll arrange a delivery date and time with you once it arrives. Freight costs are quoted separately.
+          <div style={{ ...body(12, C.textDim), background: `${C.gold}0d`, border: `1px solid ${C.gold}33`, borderRadius: 10, padding: "12px 14px", marginBottom: 18 }}>
+            <span style={{ color: C.gold, fontWeight: 700, textTransform: "uppercase" }}>Specialized White-Glove Supervised Delivery: </span>
+            Due to the monumental scale and high fragility of life-size models, orders are transported via specialized vehicles strictly accompanied by a SithGuy staff supervisor during delivery. You will select your preferred delivery date and time directly through our web platform once the statue arrives locally.
           </div>
 
           <label style={{ display: "flex", gap: 12, alignItems: "flex-start", cursor: "pointer", marginBottom: 18 }}>
             <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: C.gold, flexShrink: 0 }} />
             <span style={body(13)}>
-              I understand this is a <strong style={{ color: C.text }}>pre-order</strong>. It is ordered from the supplier after I pay, the arrival date is an estimate, and any deposit is <strong style={{ color: C.gold }}>non-refundable</strong>.
+              I understand this is a <strong style={{ color: C.text }}>strict overseas pre-order</strong> with international production. Cancellations, modifications, or refunds are strictly restricted once overseas procurement is finalized.
             </span>
           </label>
 

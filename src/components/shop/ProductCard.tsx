@@ -20,18 +20,14 @@ export function ProductCard({ product, onClick }: { product: Product; onClick: (
           </div>
           <div style={{ position: "absolute", top: 0, left: 0, right: 0, display: "flex", gap: 4, padding: 10 }}>
             {product.new && <span style={{ ...font(12, 700, 1), color: "#111", background: C.gold, borderRadius: 4, padding: "3px 10px" }}>NEW</span>}
-            {isPreOrder(product)
-              ? <span style={{ ...font(12, 700, 1), color: C.gold, background: "rgba(17,17,17,0.85)", border: `1px solid ${C.gold}`, borderRadius: 4, padding: "3px 10px" }}>PRE-ORDER</span>
-              : product.stock <= 0
-                ? <span style={{ ...font(12, 700, 1), color: "#fff", background: "#555", borderRadius: 4, padding: "3px 10px" }}>SOLD OUT</span>
-                : product.stock <= 2 && <span style={{ ...font(12, 700, 1), color: "#fff", background: "#e53e3e", borderRadius: 4, padding: "3px 10px" }}>LOW STOCK</span>}
+            <span style={{ ...font(12, 700, 1), color: C.gold, background: "rgba(17,17,17,0.9)", border: `1px solid ${C.gold}`, borderRadius: 4, padding: "3px 10px" }}>PRE-ORDER</span>
           </div>
         </div>
         <div style={{ padding: "14px 16px 16px" }}>
           <p style={{ ...font(16, 700, 0.3), color: C.text, lineHeight: 1.35, marginBottom: 8, textTransform: "uppercase" }}>{product.name}</p>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <p style={{ ...font(20, 800, 0), color: C.gold }}>₱{product.price.toLocaleString()}</p>
-            <span style={{ ...font(12, 600, 0.5), color: C.textDim, background: C.surface, borderRadius: 4, padding: "3px 10px", border: `1px solid ${C.border}` }}>{isPreOrder(product) ? "MADE TO ORDER" : product.condition.split(" ")[0].toUpperCase()}</span>
+            <span style={{ ...font(11, 700, 0.5), color: C.gold, background: `${C.gold}15`, borderRadius: 4, padding: "3px 10px", border: `1px solid ${C.gold}44` }}>MADE TO ORDER</span>
           </div>
         </div>
       </div>

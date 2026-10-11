@@ -471,11 +471,7 @@ if (page === "shop")
         cartCount={cartCount}
         onProductClick={(p) => {
           setSelectedProduct(p);
-          if (p.scale === "Lifesize") {
-            setPage("lifesize");
-          } else {
-            setPage("product");
-          }
+          setPage("lifesize");
         }}
         onCartClick={goToCart}
         onAccountClick={() =>

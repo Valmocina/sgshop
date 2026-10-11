@@ -1,8 +1,8 @@
 import type { Product, FulfillmentStatus, PaymentOption } from "@/types/store";
 
-// Lifesize figures are never held in stock: the customer orders first, then the
-// admin places the order with the supplier.
-export const isPreOrder = (p: Pick<Product, "scale">): boolean => p.scale === "Lifesize";
+// The platform maintains zero on-hand stock: all items are pure pre-orders
+// initiating overseas international procurement upon order placement.
+export const isPreOrder = (_p?: Pick<Product, "scale">): boolean => true;
 
 // Used when a product has no fixed deposit amount set. Same 30% the original
 // made-to-order page used.
@@ -29,11 +29,11 @@ export function dueNow(p: Product, qty: number, option: PaymentOption): number {
 
 // Steps the customer sees (and the admin moves orders through).
 export const FULFILLMENT_STEPS: { key: FulfillmentStatus; customer: string; admin: string; desc: string }[] = [
-  { key: "awaiting_order", customer: "Order received", admin: "Needs supplier order", desc: "Payment received. We'll place your order with our supplier." },
-  { key: "ordered", customer: "Ordered from supplier", admin: "Ordered from supplier", desc: "Your figure has been ordered and is being prepared." },
-  { key: "in_transit", customer: "On its way to the Philippines", admin: "In transit", desc: "Shipped and travelling to us, including customs clearance." },
-  { key: "arrived", customer: "Arrived — balance & delivery", admin: "Arrived", desc: "It's here. Any balance is due and we'll schedule your delivery date and time." },
-  { key: "delivered", customer: "Delivered", admin: "Delivered", desc: "Delivered to you by white-glove freight." },
+  { key: "awaiting_order", customer: "Pre-Order Confirmed", admin: "Needs supplier order", desc: "Payment received. We initiate procurement with overseas manufacturers." },
+  { key: "ordered", customer: "Overseas Production", admin: "Ordered from supplier", desc: "Your statue has been ordered with international partners and is in production." },
+  { key: "in_transit", customer: "International Transit", admin: "In transit", desc: "Shipped abroad and travelling to the Philippines, undergoing customs clearance." },
+  { key: "arrived", customer: "Arrived Locally — Schedule Delivery", admin: "Arrived", desc: "Cleared customs! Please select your White-Glove Supervised Delivery schedule." },
+  { key: "delivered", customer: "White-Glove Delivered", admin: "Delivered", desc: "Successfully delivered via specialized transport accompanied by a staff supervisor." },
 ];
 
 export const stepIndex = (s: FulfillmentStatus | null | undefined) =>

@@ -38,9 +38,9 @@ export function Sidebar({ filterSearch, setFilterSearch, newArrival, setNewArriv
 
       <CheckRow label="New Arrival" checked={newArrival} onChange={() => setNewArrival(!newArrival)} />
 
-      <SLabel>Condition</SLabel>
-      {(["Brand New", "Back in Box", "Mint in Box", "Loose No Box"] as Condition[]).map((c) => (
-        <CheckRow key={c} label={c} checked={conditions.includes(c)} onChange={() => setConditions(toggle(conditions, c))} />
+      <SLabel>Statue Edition</SLabel>
+      {(["Brand New", "Mint in Box"] as Condition[]).map((c) => (
+        <CheckRow key={c} label={c === "Brand New" ? "Overseas Factory Pre-Order" : "Monumental Collector Edition"} checked={conditions.includes(c)} onChange={() => setConditions(toggle(conditions, c))} />
       ))}
 
       <SLabel>Franchise</SLabel>
@@ -48,14 +48,14 @@ export function Sidebar({ filterSearch, setFilterSearch, newArrival, setNewArriv
         <CheckRow key={f} label={f} checked={franchises.includes(f)} onChange={() => setFranchises(toggle(franchises, f))} />
       ))}
 
-      <SLabel>Brand</SLabel>
-      {(["Sideshow", "Hot Toys", "Queen Studios", "Hasbro", "Others"] as Brand[]).map((b) => (
+      <SLabel>Studio / Brand</SLabel>
+      {(["Queen Studios", "Sideshow", "Hot Toys", "Others"] as Brand[]).map((b) => (
         <CheckRow key={b} label={b} checked={brands.includes(b)} onChange={() => setBrands(toggle(brands, b))} />
       ))}
 
-      <SLabel>Scale</SLabel>
-      {(["1:4", "1:3", "1:2", "1:6", "1:8", "Lifesize"] as Scale[]).map((s) => (
-        <CheckRow key={s} label={s} checked={scales.includes(s)} onChange={() => setScales(toggle(scales, s))} />
+      <SLabel>Scale & Size</SLabel>
+      {(["Lifesize", "1:2", "1:3", "1:4"] as Scale[]).map((s) => (
+        <CheckRow key={s} label={s === "Lifesize" ? "1:1 Lifesize (Full Scale)" : `${s} Scale Monumental`} checked={scales.includes(s)} onChange={() => setScales(toggle(scales, s))} />
       ))}
 
       <SLabel>Price (PHP)</SLabel>
