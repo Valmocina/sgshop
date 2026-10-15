@@ -7,9 +7,10 @@ import { Btn } from "@/components/ui/Btn";
 import { Input } from "@/components/ui/Input";
 import { MyOrders } from "@/components/auth/MyOrders";
 
-export function CustomerAccountPage({ customer, onChangePassword, onLogout, onBack }: {
-  customer: { name: string; email: string };
+export function CustomerAccountPage({ customer, onChangePassword, onUpdateContact, onLogout, onBack }: {
+  customer: { name: string; email: string; phone: string; contactEmail: string; contactPhone: string };
   onChangePassword: (oldPass: string, newPass: string) => Promise<{ ok: boolean; error?: string }>;
+  onUpdateContact: (email: string, phone: string) => Promise<{ ok: boolean; error?: string }>;
   onLogout: () => void;
   onBack: () => void;
 }) {
@@ -18,6 +19,10 @@ export function CustomerAccountPage({ customer, onChangePassword, onLogout, onBa
   const [confirmPass, setConfirmPass] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [contactMsg, setContactMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [contactEmail, setContactEmail] = useState(customer.contactEmail || customer.email);
+  const [contactPhone, setContactPhone] = useState(customer.contactPhone || customer.phone);
+  const [contactBusy, setContactBusy] = useState(false);
 
   const save = async () => {
     if (newPass.length < 6) { setMsg({ text: "Password must be at least 6 characters.", ok: false }); return; }
@@ -28,6 +33,25 @@ export function CustomerAccountPage({ customer, onChangePassword, onLogout, onBa
     setBusy(false);
     if (res.ok) { setMsg({ text: "Password updated successfully!", ok: true }); setOldPass(""); setNewPass(""); setConfirmPass(""); }
     else { setMsg({ text: res.error || "Current password is incorrect.", ok: false }); }
+  };
+  const saveContact = async () => {
+    if (contactEmail && !/^\S+@\S+\.\S+$/.test(contactEmail.trim())) {
+      setContactMsg({ text: "Enter a valid email address.", ok: false });
+      return;
+    }
+    const digits = contactPhone.replace(/\D/g, "");
+    if (contactPhone && !(digits.length === 10 && digits.startsWith("9") || digits.startsWith("63") && digits.length === 12 || digits.startsWith("09") && digits.length === 11)) {
+      setContactMsg({ text: "Enter a valid Philippine mobile number.", ok: false });
+      return;
+    }
+    if (contactBusy) return;
+    setContactBusy(true);
+    const phone = digits.startsWith("63") ? `+${digits}` : digits.startsWith("0") ? `+63${digits.slice(1)}` : digits ? `+63${digits}` : "";
+    const res = await onUpdateContact(contactEmail.trim(), phone);
+    setContactBusy(false);
+    setContactMsg(res.ok
+      ? { text: "Contact details saved.", ok: true }
+      : { text: res.error || "Could not update contact details.", ok: false });
   };
 
   return (
@@ -48,11 +72,23 @@ export function CustomerAccountPage({ customer, onChangePassword, onLogout, onBa
             </div>
             <div>
               <p style={{ ...font(18, 800, 1), color: C.text, textTransform: "uppercase" }}>{customer.name}</p>
-              <p style={{ ...font(13, 400, 0), color: C.textMuted, fontFamily: "'Barlow', sans-serif" }}>{customer.email}</p>
+              {customer.email && <p style={{ ...font(13, 400, 0), color: C.textMuted, fontFamily: "'Barlow', sans-serif" }}>{customer.email}</p>}
+              {customer.phone && <p style={{ ...font(13, 400, 0), color: C.textMuted, fontFamily: "'Barlow', sans-serif" }}>{customer.phone}</p>}
             </div>
           </div>
 
           <MyOrders />
+
+          <div style={{ background: C.surface, borderRadius: 14, padding: "24px 28px", border: `1px solid ${C.border}`, marginBottom: 20 }}>
+            <p style={{ ...font(14, 700, 2), color: C.text, textTransform: "uppercase", marginBottom: 8 }}>Contact Details</p>
+            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 13, color: C.textMuted, marginBottom: 18 }}>
+              Add an email or phone number so we can contact you about orders.
+            </p>
+            <Input icon={<IconUser c="#777" />} placeholder="Email address" value={contactEmail} onChange={value => { setContactEmail(value); setContactMsg(null); }} label="Email" />
+            <Input placeholder="Philippine mobile number" value={contactPhone} onChange={value => { setContactPhone(value); setContactMsg(null); }} label="Mobile Number" />
+            {contactMsg && <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 13, color: contactMsg.ok ? "#16a34a" : "#e53e3e", background: contactMsg.ok ? "#dcfce7" : "#fee2e2", borderRadius: 6, padding: "8px 12px", marginBottom: 14 }}>{contactMsg.text}</p>}
+            <Btn onClick={saveContact} full size="md" disabled={contactBusy}>{contactBusy ? "Saving…" : "Save Contact Details"}</Btn>
+          </div>
 
           {/* Change password */}
           <div style={{ background: C.surface, borderRadius: 14, padding: "24px 28px", border: `1px solid ${C.border}`, marginBottom: 20 }}>

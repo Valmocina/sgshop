@@ -12,16 +12,16 @@ const labelStyle: React.CSSProperties = { ...font(12, 700, 1.5), color: C.textMu
 const focus = (e: React.FocusEvent<HTMLInputElement>) => (e.target.style.borderColor = C.gold);
 const blur = (e: React.FocusEvent<HTMLInputElement>) => (e.target.style.borderColor = C.border);
 
-export function PaymentNumberPage({ product, qty, preorder, paymentOption, guest, defaultName, defaultEmail, onNext, onBack }: {
+export function PaymentNumberPage({ product, qty, preorder, paymentOption, guest, defaultName, defaultEmail, defaultPhone, onNext, onBack }: {
   product: Product; qty: number;
   preorder: boolean; paymentOption: PaymentOption;
   guest: boolean;                       // not signed in
-  defaultName: string; defaultEmail: string;
+  defaultName: string; defaultEmail: string; defaultPhone: string;
   onNext: (method: PayMethod, contact: ContactInfo) => void;
   onBack: () => void;
 }) {
   const [method, setMethod] = useState<PayMethod>("gcash");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(defaultPhone.replace(/^\+?63/, "").replace(/^0/, ""));
   const [name, setName] = useState(defaultName);
   const [email, setEmail] = useState(defaultEmail);
   const [error, setError] = useState("");
@@ -36,7 +36,7 @@ export function PaymentNumberPage({ product, qty, preorder, paymentOption, guest
     let digits = phone.replace(/\D/g, "");
     if (digits.startsWith("63") && digits.length > 10) digits = digits.slice(2);
     if (digits.startsWith("0")) digits = digits.slice(1);
-    if (preorder && digits.length !== 10) { setError("Please enter a valid mobile number (e.g. 917 123 4567) so we can reach you about your order."); return; }
+    if (preorder && !(digits.length === 10 && digits.startsWith("9")) && !/^\S+@\S+\.\S+$/.test(email.trim())) { setError("Add a valid email or mobile number to your account so we can reach you about your order."); return; }
     if (askIdentity && !name.trim()) { setError("Please enter your full name."); return; }
     if (askIdentity && !/^\S+@\S+\.\S+$/.test(email.trim())) { setError("Please enter a valid email address."); return; }
     setError("");

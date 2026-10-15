@@ -21,6 +21,7 @@ import { MadeToOrderProduct } from "@/components/shop/MadeToOrderProduct";
 import { isPreOrder, lineTotal, dueNow } from "@/lib/preorder";
 import { clearPendingOrder, loadPendingOrder, type PendingOrder } from "@/lib/pendingOrder";
 import type { CreateOrderArgs } from "@/components/checkout/PaymentSummaryPage";
+import { authIdentifierCredentials } from "@/lib/authIdentifier";
 
 export default function App() {
   // ── Supabase state ──
@@ -107,21 +108,34 @@ export default function App() {
 
   const loggedInCustomer =
     session?.user && !isStaffOrAdmin
-      ? { name: session.user.user_metadata?.name || session.user.email!, email: session.user.email! }
+      ? {
+          id: session.user.id,
+          name: session.user.user_metadata?.name || session.user.email || session.user.phone || "Customer",
+          email: session.user.user_metadata?.contact_email || session.user.email || "",
+          phone: session.user.user_metadata?.contact_phone || session.user.phone || "",
+          contactEmail: session.user.user_metadata?.contact_email || "",
+          contactPhone: session.user.user_metadata?.contact_phone || "",
+          identifier: session.user.email || session.user.phone || "",
+        }
       : null;
   const isAdminSession = isStaffOrAdmin;
 
-  const customerSignUp = async (name: string, email: string, password: string) => {
+  const customerSignUp = async (name: string, identifier: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({
-      email, password, options: { data: { name } },
+      ...authIdentifierCredentials(identifier),
+      password,
+      options: { data: { name } },
     });
     if (error) return { ok: false, error: error.message };
     if (!data.session) return { ok: true, needsConfirmation: true };
     return { ok: true };
   };
 
-  const customerSignIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const customerSignIn = async (identifier: string, password: string) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      ...authIdentifierCredentials(identifier),
+      password,
+    });
     if (error) return { ok: false, error: error.message };
     const role = data.user?.app_metadata?.role;
     if (role === "admin" || role === "staff") {
@@ -142,8 +156,11 @@ export default function App() {
     return { ok: true };
   };
 
-  const changeOwnPassword = async (email: string, oldPassword: string, newPassword: string) => {
-    const { error: reauthError } = await supabase.auth.signInWithPassword({ email, password: oldPassword });
+  const changeOwnPassword = async (identifier: string, oldPassword: string, newPassword: string) => {
+    const { error: reauthError } = await supabase.auth.signInWithPassword({
+      ...authIdentifierCredentials(identifier),
+      password: oldPassword,
+    });
     if (reauthError) return { ok: false, error: "Current password is incorrect." };
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { ok: false, error: error.message };
@@ -174,9 +191,32 @@ export default function App() {
   const [confirmedOrder, setConfirmedOrder] = useState<PendingOrder | null>(null);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const [contact, setContact] = useState<ContactInfo>({ name: "", email: "", phone: "" });
+  const [authForCheckout, setAuthForCheckout] = useState(false);
   // Read once on load: after a PayMongo redirect this is the order we're coming back to.
   const [returnOrder] = useState<PendingOrder | null>(() => loadPendingOrder());
   const [paymongoPublicKey, setPaymongoPublicKey] = useState("");
+
+  useEffect(() => {
+    if (authLoading || !products.length) return;
+    const raw = sessionStorage.getItem("pendingCheckout");
+    if (!raw) return;
+    try {
+      const pending = JSON.parse(raw) as { productId: number; qty: number; paymentOption: PaymentOption };
+      const product = products.find((item) => item.id === pending.productId);
+      if (!product || !Number.isInteger(pending.qty) || pending.qty < 1) {
+        sessionStorage.removeItem("pendingCheckout");
+        return;
+      }
+      setSelectedProduct(product);
+      setOrderQty(pending.qty);
+      setCheckoutOption(pending.paymentOption === "deposit" ? "deposit" : "full");
+      setAuthForCheckout(true);
+      setPage(session?.user && !isStaffOrAdmin ? "payment-number" : "auth");
+    } catch (error) {
+      console.error("Could not restore checkout after account sign-in:", error);
+      sessionStorage.removeItem("pendingCheckout");
+    }
+  }, [authLoading, products, session, isStaffOrAdmin]);
 
   useEffect(() => {
     const handler = () => setRoute(window.location.hash);
@@ -266,9 +306,9 @@ export default function App() {
       .insert({
         id: orderId,
         customer_id: customer?.id ?? null,
-        customer_name: customer?.name || contact.name || "Guest",
+        customer_name: customer?.name || contact.name || "Customer",
         customer_email: customer?.email || contact.email || null,
-        customer_phone: contact.phone ? "+63" + contact.phone : null,
+        customer_phone: contact.phone ? "+63" + contact.phone : customer?.phone || null,
         status: "pending",
         total: lineTotal(product, qty),
         amount_due_now: dueNow(product, qty, option),
@@ -415,19 +455,49 @@ export default function App() {
     setPage("shop");
     setActiveCategory("ALL");
   };
+  const returnFromAuth = () => {
+    if (authForCheckout) {
+      sessionStorage.removeItem("pendingCheckout");
+      setAuthForCheckout(false);
+      setPage("payment-number");
+    } else {
+      goToStore();
+    }
+  };
+  const cancelCheckoutAuth = () => {
+    sessionStorage.removeItem("pendingCheckout");
+    setAuthForCheckout(false);
+    goToStore();
+  };
+  const continueToCheckout = (product: Product, qty: number, option: PaymentOption) => {
+    setSelectedProduct(product);
+    setOrderQty(qty);
+    setCheckoutOption(option);
+    if (loggedInCustomer) {
+      setPage("payment-number");
+      return;
+    }
+    sessionStorage.setItem("pendingCheckout", JSON.stringify({
+      productId: product.id,
+      qty,
+      paymentOption: option,
+    }));
+    setAuthForCheckout(true);
+    setPage("auth");
+  };
 
   if (page === "auth")
     return (
       <AuthPage
         onLogin={async (email, password) => {
           const res = await customerSignIn(email, password);
-          if (res.ok) goToStore();
+          if (res.ok) returnFromAuth();
           return res;
         }}
-        onBack={goToStore}
+        onBack={cancelCheckoutAuth}
         onSignUp={async (name, email, password) => {
           const res = await customerSignUp(name, email, password);
-          if (res.ok && !res.needsConfirmation) goToStore();
+          if (res.ok && !res.needsConfirmation) returnFromAuth();
           return res;
         }}
         onForgotPassword={sendPasswordReset}
@@ -439,8 +509,14 @@ export default function App() {
       <CustomerAccountPage
         customer={loggedInCustomer}
         onChangePassword={(oldPass, newPass) =>
-          changeOwnPassword(loggedInCustomer.email, oldPass, newPass)
+          changeOwnPassword(loggedInCustomer.identifier, oldPass, newPass)
         }
+        onUpdateContact={async (email, phone) => {
+          const { error } = await supabase.auth.updateUser({
+            data: { contact_email: email || null, contact_phone: phone || null },
+          });
+          return error ? { ok: false, error: error.message } : { ok: true };
+        }}
         onLogout={async () => {
           await supabase.auth.signOut();
           goToStore();
@@ -515,10 +591,7 @@ if (page === "shop")
         <MadeToOrderProduct
           product={selectedProduct}
           onCheckout={({ paymentOption, qty }) => {
-            // Pre-orders skip the cart and go straight to checkout.
-            setOrderQty(qty);
-            setCheckoutOption(paymentOption);
-            setPage("payment-number");
+            continueToCheckout(selectedProduct, qty, paymentOption);
           }}
         />
       </div>
@@ -539,10 +612,7 @@ if (page === "shop")
           )
         }
         onCheckout={(product, qty) => {
-          setSelectedProduct(product);
-          setOrderQty(qty);
-          setCheckoutOption("full");
-          setPage("payment-number");
+          continueToCheckout(product, qty, "full");
         }}
         onCartClick={goToCart}
         onAccountClick={() =>
@@ -565,6 +635,9 @@ if (page === "shop")
       />
     );
 
+  if (page === "payment-number" && selectedProduct && authForCheckout && !loggedInCustomer)
+    return <LoadingScreen />;
+
   if (page === "payment-number" && selectedProduct)
     return (
       <PaymentNumberPage
@@ -575,6 +648,7 @@ if (page === "shop")
         guest={!loggedInCustomer}
         defaultName={loggedInCustomer?.name ?? ""}
         defaultEmail={loggedInCustomer?.email ?? ""}
+        defaultPhone={loggedInCustomer?.phone ?? ""}
         onNext={(m, c) => {
           setPayMethod(m);
           setContact(c);
@@ -594,7 +668,7 @@ if (page === "shop")
         paymentOption={checkoutOption}
         contact={contact}
         paymongoPublicKey={paymongoPublicKey}
-        customer={loggedInCustomer ? { id: session!.user.id, name: loggedInCustomer.name, email: loggedInCustomer.email } : null}
+        customer={loggedInCustomer ? { id: session!.user.id, name: loggedInCustomer.name, email: loggedInCustomer.email, phone: loggedInCustomer.phone } : null}
         onCreateOrder={createPendingOrder}
         onMarkOrderPaid={(orderId, status, amountPaid) => markOrderStatus(orderId, status, amountPaid)}
         onContinue={(info) => {

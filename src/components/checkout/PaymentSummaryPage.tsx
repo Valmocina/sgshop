@@ -9,7 +9,7 @@ export interface CreateOrderArgs {
   product: Product; qty: number; method: PayMethod;
   preorder: boolean; paymentOption: PaymentOption;
   contact: ContactInfo;
-  customer: { id: string; name: string; email: string } | null;
+  customer: { id: string; name: string; email: string; phone: string } | null;
 }
 
 const Row = ({ label, value, bold }: { label: string; value: string; bold?: boolean }) => (
@@ -24,7 +24,7 @@ export function PaymentSummaryPage({ product, qty, method, preorder, paymentOpti
   preorder: boolean; paymentOption: PaymentOption;
   contact: ContactInfo;
   paymongoPublicKey: string;
-  customer: { id: string; name: string; email: string } | null;
+  customer: { id: string; name: string; email: string; phone: string } | null;
   onCreateOrder: (args: CreateOrderArgs) => Promise<string>;
   onMarkOrderPaid: (orderId: string, status: PendingOrder["paidStatus"], amountPaid: number) => Promise<void>;
   onContinue: (info: PendingOrder) => void;

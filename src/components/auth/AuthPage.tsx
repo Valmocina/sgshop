@@ -5,16 +5,17 @@ import { IconUser, IconLock, IconSearch, IconCart, IconArrowLeft, IconCheck } fr
 import { Logo } from "@/components/ui/Logo";
 import { Btn } from "@/components/ui/Btn";
 import { Input } from "@/components/ui/Input";
+import { normalizeAuthIdentifier } from "@/lib/authIdentifier";
 
 export function AuthPage({ onLogin, onBack, onSignUp, onForgotPassword }: {
-  onLogin: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
+  onLogin: (identifier: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   onBack?: () => void;
-  onSignUp: (name: string, email: string, password: string) => Promise<{ ok: boolean; error?: string; needsConfirmation?: boolean }>;
+  onSignUp: (name: string, identifier: string, password: string) => Promise<{ ok: boolean; error?: string; needsConfirmation?: boolean }>;
   onForgotPassword: (email: string) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [showSignUp, setShowSignUp] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -23,26 +24,29 @@ export function AuthPage({ onLogin, onBack, onSignUp, onForgotPassword }: {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotMsg, setForgotMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
-  const resetFields = () => { setEmail(""); setPassword(""); setName(""); setConfirm(""); setError(""); };
+  const resetFields = () => { setIdentifier(""); setPassword(""); setName(""); setConfirm(""); setError(""); };
 
   const submitLogin = async () => {
     if (busy) return;
     setBusy(true);
     setError("");
-    const res = await onLogin(email, password);
+    const normalized = normalizeAuthIdentifier(identifier);
+    if (!normalized) { setBusy(false); setError("Enter a valid email address or Philippine mobile number."); return; }
+    const res = await onLogin(normalized, password);
     setBusy(false);
     if (!res.ok) setError(res.error || "Invalid email or password.");
   };
 
   const submitSignUp = async () => {
     if (!name.trim()) { setError("Please enter your name."); return; }
-    if (!email.trim()) { setError("Please enter your email."); return; }
+    const normalized = normalizeAuthIdentifier(identifier);
+    if (!normalized) { setError("Enter a valid email address or Philippine mobile number."); return; }
     if (password.length < 6) { setError("Password must be at least 6 characters."); return; }
     if (password !== confirm) { setError("Passwords do not match."); return; }
     if (busy) return;
     setBusy(true);
     setError("");
-    const res = await onSignUp(name.trim(), email.trim(), password);
+    const res = await onSignUp(name.trim(), normalized, password);
     setBusy(false);
     if (!res.ok) { setError(res.error || "Could not create account."); return; }
     if (res.needsConfirmation) {
@@ -51,7 +55,8 @@ export function AuthPage({ onLogin, onBack, onSignUp, onForgotPassword }: {
       setShowSignUp(false);
       setForgotMsg(null);
       setShowForgot(false);
-      alert("Account created! Please check your email to confirm your address before signing in.");
+      const channel = normalized.startsWith("+63") ? "SMS" : "email";
+      alert(`Account created! Please check your ${channel} to confirm your account before signing in.`);
       return;
     }
     resetFields();
@@ -125,7 +130,7 @@ export function AuthPage({ onLogin, onBack, onSignUp, onForgotPassword }: {
               </div>
               <div style={{ background: C.lightBg, borderRadius: "0 0 14px 14px", padding: "28px 20px 24px", border: `1px solid ${C.border}`, borderTop: "none" }}>
                 <h2 style={{ ...font(34, 800, 4), color: "#1a1a1a", textAlign: "center", marginBottom: 28, textTransform: "uppercase" }}>WELCOME BACK</h2>
-                <Input icon={<IconUser c="#777" />} placeholder="Email Address" value={email} onChange={v => { setEmail(v); setError(""); }} />
+                <Input icon={<IconUser c="#777" />} placeholder="Email or Mobile Number" value={identifier} onChange={v => { setIdentifier(v); setError(""); }} />
                 <Input icon={<IconLock c="#777" />} type="password" placeholder="Password" value={password} onChange={v => { setPassword(v); setError(""); }} />
                 {error && <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 14, color: "#e53e3e", background: "#fee2e2", borderRadius: 6, padding: "8px 12px", marginBottom: 14 }}>{error}</p>}
                 <div style={{ textAlign: "right", marginBottom: 20, marginTop: -4 }}>
@@ -164,7 +169,7 @@ export function AuthPage({ onLogin, onBack, onSignUp, onForgotPassword }: {
               <div style={{ background: C.lightBg, borderRadius: "0 0 14px 14px", padding: "32px 20px 32px", border: `1px solid ${C.border}`, borderTop: "none" }}>
                 <h2 style={{ ...font(26, 800, 4), color: "#1a1a1a", textAlign: "center", marginBottom: 24, textTransform: "uppercase" }}>CREATE ACCOUNT</h2>
                 <Input icon={<IconUser c="#777" />} placeholder="Full Name" value={name} onChange={v => { setName(v); setError(""); }} label="Full Name" />
-                <Input placeholder="Email Address" value={email} onChange={v => { setEmail(v); setError(""); }} label="Email" />
+                <Input placeholder="Email or Mobile Number" value={identifier} onChange={v => { setIdentifier(v); setError(""); }} label="Email or Mobile Number" />
                 <Input icon={<IconLock c="#777" />} type="password" placeholder="Password" value={password} onChange={v => { setPassword(v); setError(""); }} label="Password" />
                 <Input icon={<IconLock c="#777" />} type="password" placeholder="Confirm Password" value={confirm} onChange={v => { setConfirm(v); setError(""); }} label="Confirm Password" />
                 {error && <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 13, color: "#e53e3e", background: "#fee2e2", borderRadius: 6, padding: "8px 12px", marginBottom: 14 }}>{error}</p>}
