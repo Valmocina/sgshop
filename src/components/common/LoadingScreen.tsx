@@ -31,7 +31,7 @@ export function LoadingScreen() {
       <style>{`
         .loading-saber-frame {
           position: relative;
-          width: min(680px, 88vw);
+          width: min(850px, 92vw);
           height: 48px;
         }
         .loading-saber {
@@ -41,9 +41,9 @@ export function LoadingScreen() {
         }
         .loading-saber-hilt {
           position: absolute;
-          left: 42px;
+          left: 48px;
           top: -25px;
-          width: 24px;
+          width: 27px;
           height: auto;
           transform: rotate(90deg);
           z-index: 1;
@@ -51,17 +51,17 @@ export function LoadingScreen() {
         }
         .loading-saber-blade {
           position: absolute;
-          left: 91px;
+          left: 102px;
           top: 20px;
           width: 0;
-          height: 7px;
+          height: 8px;
           border-radius: 6px 6px 2px 2px;
           background: #fff0f0;
-          box-shadow: 0 0 5px 2px #ff3030, 0 0 14px 5px #ff000099;
+          box-shadow: 0 0 6px 3px #ff3030, 0 0 16px 6px #ff000099;
           animation: saber-extend 1.2s ease-out forwards;
         }
         @keyframes saber-extend {
-          to { width: calc(100% - 91px); }
+          to { width: calc(100% - 102px); }
         }
       `}</style>
     </div>
