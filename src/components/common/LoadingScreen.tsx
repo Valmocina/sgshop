@@ -31,39 +31,37 @@ export function LoadingScreen() {
       <style>{`
         .loading-saber-frame {
           position: relative;
-          width: min(380px, 70vw, 45vh);
+          width: min(560px, 82vw);
           height: 64px;
         }
         .loading-saber {
-          position: absolute;
-          left: 50%;
-          top: 50%;
-          width: 64px;
-          height: min(380px, 70vw, 45vh);
-          transform: translate(-50%, -50%) rotate(90deg);
+          position: relative;
+          width: 100%;
+          height: 100%;
         }
         .loading-saber-hilt {
           position: absolute;
-          left: 13px;
-          bottom: 0;
+          left: 54px;
+          top: -40px;
           width: 38px;
           height: auto;
+          transform: rotate(90deg);
           z-index: 1;
           display: block;
         }
         .loading-saber-blade {
           position: absolute;
-          left: 28px;
-          bottom: 140px;
-          width: 8px;
-          height: 0;
+          left: 132px;
+          top: 28px;
+          width: 0;
+          height: 8px;
           border-radius: 6px 6px 2px 2px;
           background: #fff0f0;
           box-shadow: 0 0 5px 2px #ff3030, 0 0 14px 5px #ff000099;
           animation: saber-extend 1.2s ease-out forwards;
         }
         @keyframes saber-extend {
-          to { height: calc(100% - 140px); }
+          to { width: calc(100% - 132px); }
         }
       `}</style>
     </div>
