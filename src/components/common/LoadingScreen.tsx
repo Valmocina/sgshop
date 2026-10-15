@@ -42,7 +42,7 @@ export function LoadingScreen() {
         .loading-saber-hilt {
           position: absolute;
           left: 48px;
-          top: -27.5px;
+          top: -26px;
           width: 27px;
           height: auto;
           transform: rotate(90deg);
