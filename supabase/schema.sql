@@ -307,6 +307,21 @@ end $$;
 create trigger orders_guard_trg before update on public.orders
 for each row execute function public.orders_guard();
 
+create or replace function public.orders_require_full_payment_for_delivery() returns trigger
+language plpgsql as $$
+begin
+  if old.status is distinct from 'paid' or old.amount_paid < old.total then
+    raise exception 'Full payment must be confirmed before delivery';
+  end if;
+  return new;
+end $$;
+
+create trigger orders_require_full_payment_for_delivery_trg
+before update of fulfillment_status on public.orders
+for each row
+when (new.fulfillment_status = 'delivered' and old.fulfillment_status is distinct from new.fulfillment_status)
+execute function public.orders_require_full_payment_for_delivery();
+
 create policy "orders_delete_admin" on public.orders for delete to authenticated using (public.is_admin());
 
 -- ── Storage: product-images bucket ─────────────────────────────────────────

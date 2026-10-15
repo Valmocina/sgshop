@@ -54,6 +54,7 @@ function OrderCard({ order, onSave, busy }: {
   const pre = order.order_type === "preorder";
   const st = STATUS_STYLE[order.status] ?? { label: order.status, color: A.textMuted };
   const balance = Math.max(0, order.total - order.amount_paid);
+  const fullyPaid = order.status === "paid" && order.amount_paid >= order.total;
 
   const [eta, setEta] = useState(order.est_arrival ?? "");
   const [ref, setRef] = useState(order.supplier_ref ?? "");
@@ -218,8 +219,10 @@ function OrderCard({ order, onSave, busy }: {
                 <div style={{ marginTop: 10, padding: "12px 14px", background: A.card, border: `1px solid ${A.border}`, borderRadius: 8 }}>
                   {order.fulfillment_status === "arrived" && !order.delivery_date ? (
                     <p style={{ ...af(13, 600), color: A.gold }}>Waiting for customer to schedule delivery.</p>
+                  ) : nextProgress?.status === "delivered" && !fullyPaid ? (
+                    <p style={{ ...af(13, 600), color: A.gold }}>Confirm full payment before marking this order delivered.</p>
                   ) : nextProgress && (
-                    <button disabled={busy || (nextProgress.status === "delivered" && (!order.delivery_date || !order.delivery_time_slot))} onClick={() => {
+                    <button disabled={busy || (nextProgress.status === "delivered" && (!fullyPaid || !order.delivery_date || !order.delivery_time_slot))} onClick={() => {
                       const changes: Partial<OrderRecord> = { ...details(), fulfillment_status: nextProgress.status };
                       if (nextProgress.status === "ordered") changes.ordered_at = new Date().toISOString();
                       onSave(order.id, changes, nextProgress.label);
