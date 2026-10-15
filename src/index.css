@@ -25,6 +25,20 @@ input[type="number"]::-webkit-outer-spin-button {
   display: none;
 }
 
+.admin-order-button {
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.admin-order-button:not(:disabled):hover {
+  transform: translateY(-1px);
+  filter: brightness(1.15);
+}
+
+.admin-order-button:focus-visible {
+  outline: 2px solid #F5A623;
+  outline-offset: 2px;
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }

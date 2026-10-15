@@ -55,9 +55,9 @@ function OrderCard({ order, onSave, busy }: {
   const st = STATUS_STYLE[order.status] ?? { label: order.status, color: A.textMuted };
   const balance = Math.max(0, order.total - order.amount_paid);
   const fullyPaid = order.status === "paid" && order.amount_paid >= order.total;
+  const orderRef = `SG-${order.id.toUpperCase()}`;
 
   const [eta, setEta] = useState(order.est_arrival ?? "");
-  const [ref, setRef] = useState(order.supplier_ref ?? "");
   const [notes, setNotes] = useState(order.admin_notes ?? "");
   const [courier, setCourier] = useState(order.courier_name ?? "");
   const [tracking, setTracking] = useState(order.tracking_number ?? "");
@@ -66,20 +66,18 @@ function OrderCard({ order, onSave, busy }: {
   const [manageProgress, setManageProgress] = useState(false);
 
   const dirty = eta !== (order.est_arrival ?? "")
-    || ref !== (order.supplier_ref ?? "")
     || notes !== (order.admin_notes ?? "")
     || courier !== (order.courier_name ?? "")
     || tracking !== (order.tracking_number ?? "");
 
   const details = () => ({
     est_arrival: eta.trim() || null,
-    supplier_ref: ref.trim() || null,
     admin_notes: notes.trim() || null,
     courier_name: courier.trim() || null,
     tracking_number: tracking.trim() || null,
   });
   const workflowActive = isPaid(order) && order.status !== "cancelled" && review === "accepted";
-  const canAdminCancel = isPaid(order) && order.status !== "cancelled";
+  const canAdminCancel = isPaid(order) && order.status !== "cancelled" && order.fulfillment_status !== "delivered";
   const nextProgress: { status: FulfillmentStatus; label: string } | null = ({
     awaiting_order: { status: "ordered", label: "Mark ordered from supplier" },
     ordered: { status: "in_transit", label: "Mark in transit" },
@@ -88,6 +86,8 @@ function OrderCard({ order, onSave, busy }: {
   } as Partial<Record<FulfillmentStatus, { status: FulfillmentStatus; label: string }>>)[order.fulfillment_status ?? "awaiting_order"] ?? null;
   const updateReview = async (status: ReviewStatus) => {
     if (busy || savingReview || order.status === "cancelled" || order.fulfillment_status !== "awaiting_order" || status === review) return;
+    if (status === "accepted" && !window.confirm("Accept this pre-order and allow it to proceed to supplier ordering?")) return;
+    if (status === "rejected" && !window.confirm("Reject this pre-order? This will cancel the order and cannot be undone.")) return;
     const changes: Partial<OrderRecord> = { review_status: status };
     if (status === "rejected") {
       changes.status = "cancelled";
@@ -113,7 +113,7 @@ function OrderCard({ order, onSave, busy }: {
             {order.order_items.map(i => `${i.product_name}${i.quantity > 1 ? ` ×${i.quantity}` : ""}`).join(", ") || "Order"}
           </p>
           <p style={{ ...af(12, 400), color: A.textMuted }}>
-            #{order.id.slice(0, 8)} · {new Date(order.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}
+            Order Ref: <strong style={{ color: A.text }}>{orderRef}</strong> · {new Date(order.created_at).toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" })}
             {order.payment_method ? ` · ${order.payment_method === "gcash" ? "GCash" : "Maya"}` : ""}
           </p>
         </div>
@@ -169,10 +169,6 @@ function OrderCard({ order, onSave, busy }: {
               <label style={labelStyle}>Estimated arrival</label>
               <input value={eta} onChange={e => setEta(e.target.value)} placeholder="e.g. 10–12 weeks" style={inputStyle} />
             </div>
-            <div>
-              <label style={labelStyle}>Supplier order ref</label>
-              <input value={ref} onChange={e => setRef(e.target.value)} placeholder="PO / tracking no." style={inputStyle} />
-            </div>
           </div>
 
           <div style={{ marginBottom: 14 }}>
@@ -183,7 +179,7 @@ function OrderCard({ order, onSave, busy }: {
                 ["accepted", "Accepted"],
                 ["rejected", "Rejected"],
               ] as [ReviewStatus, string][]).map(([status, label]) => (
-                <button key={status} disabled={busy || !!savingReview || order.status === "cancelled" || order.fulfillment_status !== "awaiting_order"} onClick={() => updateReview(status)} style={{
+                <button className="admin-order-button" key={status} disabled={busy || !!savingReview || order.status === "cancelled" || order.fulfillment_status !== "awaiting_order"} onClick={() => updateReview(status)} style={{
                   padding: "8px 13px", borderRadius: 7, border: `1px solid ${review === status ? A.gold : A.border}`,
                   background: review === status ? `${A.gold}22` : "transparent", ...af(12, 700),
                   color: review === status ? A.gold : A.textMuted, cursor: busy || savingReview || order.status === "cancelled" || order.fulfillment_status !== "awaiting_order" ? "not-allowed" : "pointer",
@@ -212,7 +208,7 @@ function OrderCard({ order, onSave, busy }: {
 
           {workflowActive && (
             <div style={{ marginBottom: 12 }}>
-              <button onClick={() => setManageProgress(value => !value)} style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${A.gold}`, borderRadius: 8, ...af(13, 700), color: A.gold, cursor: "pointer" }}>
+              <button className="admin-order-button" onClick={() => setManageProgress(value => !value)} style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${A.gold}`, borderRadius: 8, ...af(13, 700), color: A.gold, cursor: "pointer" }}>
                 {manageProgress ? "Close Progress" : "Manage Progress"}
               </button>
               {manageProgress && (
@@ -222,7 +218,7 @@ function OrderCard({ order, onSave, busy }: {
                   ) : nextProgress?.status === "delivered" && !fullyPaid ? (
                     <p style={{ ...af(13, 600), color: A.gold }}>Confirm full payment before marking this order delivered.</p>
                   ) : nextProgress && (
-                    <button disabled={busy || (nextProgress.status === "delivered" && (!fullyPaid || !order.delivery_date || !order.delivery_time_slot))} onClick={() => {
+                    <button className="admin-order-button" disabled={busy || (nextProgress.status === "delivered" && (!fullyPaid || !order.delivery_date || !order.delivery_time_slot))} onClick={() => {
                       const changes: Partial<OrderRecord> = { ...details(), fulfillment_status: nextProgress.status };
                       if (nextProgress.status === "ordered") changes.ordered_at = new Date().toISOString();
                       onSave(order.id, changes, nextProgress.label);
@@ -237,12 +233,12 @@ function OrderCard({ order, onSave, busy }: {
           )}
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            <button disabled={busy || !dirty} onClick={() => onSave(order.id, details(), "Order details updated")}
+            <button className="admin-order-button" disabled={busy || !dirty} onClick={() => onSave(order.id, details(), "Order details updated")}
               style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${dirty ? A.gold : A.border}`, borderRadius: 8, ...af(13, 600), color: dirty ? A.gold : A.textMuted, cursor: dirty ? "pointer" : "default" }}>
               Save details
             </button>
             {order.status === "deposit_paid" && (
-              <button disabled={busy} onClick={() => {
+              <button className="admin-order-button" disabled={busy} onClick={() => {
                 if (window.confirm(`Confirm you've received the remaining ${peso(balance)} from ${order.customer_name}?`))
                   onSave(order.id, { status: "paid", amount_paid: order.total }, "Balance recorded — order is now fully paid");
               }}
@@ -251,7 +247,7 @@ function OrderCard({ order, onSave, busy }: {
               </button>
             )}
             {canAdminCancel && (
-              <button disabled={busy} onClick={() => {
+              <button className="admin-order-button" disabled={busy} onClick={() => {
                 if (window.confirm("Cancel this order? Any payment already received will remain recorded and will not be refunded automatically."))
                   onSave(order.id, { status: "cancelled", cancellation_reason: "admin_cancelled", delivery_date: null, delivery_time_slot: null }, "Order cancelled by admin");
               }}
@@ -331,7 +327,7 @@ export function AdminOrdersPanel({ showToast, onChanged }: {
     <div style={{ padding: "28px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ ...af(22, 700), color: A.text }}>Orders</h1>
-        <button onClick={load} style={{ padding: "8px 14px", background: "transparent", border: `1px solid ${A.border}`, borderRadius: 7, ...af(13, 600), color: A.textMuted, cursor: "pointer" }}>Refresh</button>
+        <button className="admin-order-button" onClick={load} style={{ padding: "8px 14px", background: "transparent", border: `1px solid ${A.border}`, borderRadius: 7, ...af(13, 600), color: A.textMuted, cursor: "pointer" }}>Refresh</button>
       </div>
       <p style={{ ...af(13, 400), color: A.textMuted, marginBottom: 18, lineHeight: 1.6 }}>
         Lifesize figures aren't stocked. When a customer pre-orders and pays, it lands under <strong style={{ color: A.text }}>Needs supplier order</strong> — place the order with your supplier, then mark it here and keep the progress and arrival estimate up to date.
@@ -342,7 +338,7 @@ export function AdminOrdersPanel({ showToast, onChanged }: {
           const active = filter === f.key;
           const urgent = f.key === "to_order" && counts.to_order > 0;
           return (
-            <button key={f.key} onClick={() => { setFilter(f.key); void load(); }} style={{
+            <button className="admin-order-button" key={f.key} onClick={() => { setFilter(f.key); void load(); }} style={{
               padding: "8px 14px", borderRadius: 20, cursor: "pointer", ...af(13, active ? 700 : 500),
               background: active ? `${A.gold}18` : A.card, color: active ? A.gold : A.textMuted,
               border: `1px solid ${active ? A.gold : urgent ? `${A.gold}66` : A.border}`,
