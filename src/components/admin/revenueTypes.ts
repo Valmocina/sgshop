@@ -18,6 +18,7 @@ export type OrderRow = {
   payment_method: string | null;
   customer_name: string;
   created_at: string;
+  archived_at: string | null;
   order_items: OrderItemRow[];
 };
 

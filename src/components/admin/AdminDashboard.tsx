@@ -39,6 +39,7 @@ export function AdminDashboard({ products, onUpdate, onAdd, onDelete, onLogout, 
       .select("id", { count: "exact", head: true })
       .eq("order_type", "preorder")
       .eq("fulfillment_status", "awaiting_order")
+      .is("archived_at", null)
       .in("status", ["paid", "deposit_paid"]);
     setNeedsSupplierOrder(count ?? 0);
   }, []);
@@ -47,6 +48,23 @@ export function AdminDashboard({ products, onUpdate, onAdd, onDelete, onLogout, 
   const showToast = (msg: string, type: "success" | "error" = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const archiveAllOrders = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .update({ archived_at: new Date().toISOString() })
+        .is("archived_at", null)
+        .select("id");
+      if (error) throw error;
+      showToast(`${data?.length ?? 0} order${data?.length === 1 ? "" : "s"} archived.`);
+      await refreshOrderCount();
+      return true;
+    } catch (error) {
+      showToast(`Could not archive orders: ${error instanceof Error ? error.message : "Unexpected error."}`, "error");
+      return false;
+    }
   };
 
   const filtered = products.filter(p => {
@@ -130,6 +148,7 @@ export function AdminDashboard({ products, onUpdate, onAdd, onDelete, onLogout, 
             onChangeAdminPassword={onChangeAdminPassword}
             paymongoPublicKey={paymongoPublicKey}
             onChangePaymongoKey={onChangePaymongoKey}
+            onArchiveAllOrders={archiveAllOrders}
             showToast={showToast}
           />
         ) : tab === "orders" ? (
@@ -281,4 +300,3 @@ export function AdminDashboard({ products, onUpdate, onAdd, onDelete, onLogout, 
     </div>
   );
 }
-

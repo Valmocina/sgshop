@@ -39,7 +39,6 @@ export default function RevenueOverview() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [clearing, setClearing] = useState(false);
 
   const range = useMemo(
     () => getDateRange(rangeKey, customStart, customEnd),
@@ -53,7 +52,7 @@ export default function RevenueOverview() {
       // Single round trip: orders + their line items, embedded via the FK relationship.
       const { data, error: err } = await supabase
         .from("orders")
-        .select("id, status, total, refunded_amount, payment_method, customer_name, created_at, order_items(product_name, category, unit_price, quantity)")
+        .select("id, status, total, refunded_amount, payment_method, customer_name, created_at, archived_at, order_items(product_name, category, unit_price, quantity)")
         .gte("created_at", range.start.toISOString())
         .lte("created_at", range.end.toISOString())
         .order("created_at", { ascending: false });
@@ -162,20 +161,34 @@ export default function RevenueOverview() {
     URL.revokeObjectURL(url);
   };
 
-  // ── Clear all data (destructive) ──
-  const clearAllData = async () => {
-    setClearing(true);
+  const archiveTransaction = async (id: string, archived: boolean) => {
+    const archivedAt = archived ? new Date().toISOString() : null;
     try {
-      // order_items rows cascade-delete automatically via the FK's ON DELETE CASCADE.
-      const { error: err } = await supabase.from("orders").delete().gte("created_at", "1900-01-01");
-      if (err) throw err;
-      await fetchOrders();
+      const { data, error: err } = await supabase
+        .from("orders")
+        .update({ archived_at: archivedAt })
+        .eq("id", id)
+        .select("id")
+        .maybeSingle();
+      if (err || !data) throw err ?? new Error("Order was not found or could not be updated.");
+      setOrders(prev => prev.map(order => order.id === id
+        ? { ...order, archived_at: archivedAt }
+        : order));
+      return true;
     } catch (err: any) {
-      console.error("Failed to clear revenue data:", err);
-      setError(err.message || "Failed to clear data. Please try again.");
-    } finally {
-      setClearing(false);
+      console.error("Failed to update archived order:", err);
+      setError(err.message || "Failed to update archive status. Please try again.");
+      return false;
     }
+  };
+  const printRevenue = () => {
+    const clearPrintTarget = () => {
+      delete document.body.dataset.adminPrint;
+      window.removeEventListener("afterprint", clearPrintTarget);
+    };
+    document.body.dataset.adminPrint = "revenue";
+    window.addEventListener("afterprint", clearPrintTarget);
+    window.print();
   };
 
   const summaryCards = [
@@ -190,17 +203,6 @@ export default function RevenueOverview() {
 
   return (
     <div className="revenue-print-area" style={{ padding: "28px 28px" }}>
-      {/* Print-only styling: hides everything else on the page and shows just this section. */}
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          .revenue-print-area, .revenue-print-area * { visibility: visible; }
-          .revenue-print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; background: #fff !important; }
-          .revenue-print-area * { color: #111 !important; background: #fff !important; border-color: #ccc !important; }
-          .no-print { display: none !important; }
-        }
-      `}</style>
-
       {/* Header */}
       <div className="no-print" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22, flexWrap: "wrap", gap: 12 }}>
         <h1 style={{ ...af(22, 700), color: TEXT }}>Revenue</h1>
@@ -218,7 +220,7 @@ export default function RevenueOverview() {
                 style={{ background: CARD, border: `1px solid ${BORDER}`, borderRadius: 7, padding: "8px 10px", ...af(13, 500), color: TEXT, outline: "none" }} />
             </>
           )}
-          <button onClick={() => window.print()} style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 7, padding: "9px 14px", ...af(13, 600), color: TEXT_MUTED, cursor: "pointer" }}>
+          <button onClick={printRevenue} style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 7, padding: "9px 14px", ...af(13, 600), color: TEXT_MUTED, cursor: "pointer" }}>
             <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><polyline points="6 9 6 2 18 2 18 9" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x={6} y={14} width={12} height={8} /></svg>
             Print
           </button>
@@ -279,7 +281,7 @@ export default function RevenueOverview() {
           {/* Recent transactions — always shown, even with zero orders, so filters/clear are reachable */}
           <div style={sectionStyle}>
             <p style={{ ...af(15, 700), color: TEXT, marginBottom: 16 }}>Recent Transactions</p>
-            <RecentTransactions transactions={orders} onClearAll={clearAllData} clearing={clearing} />
+            <RecentTransactions transactions={orders} onArchive={archiveTransaction} />
           </div>
         </>
       )}

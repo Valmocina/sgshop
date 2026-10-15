@@ -3,13 +3,13 @@ import { formatPeso, type OrderRow } from "./revenueTypes";
 
 const BORDER = "#2A2A2A";
 const CARD = "#202020";
-const SURFACE = "#1A1A1A";
 const TEXT = "#F0F0F0";
 const TEXT_MUTED = "#666";
 const GOLD = "#F5A623";
 const GREEN = "#22c55e";
 const RED = "#ef4444";
 const YELLOW = "#eab308";
+const BLUE = "#3b82f6";
 
 const thStyle: React.CSSProperties = {
   padding: "10px 14px", fontFamily: "'Barlow', sans-serif", fontSize: 11, fontWeight: 700,
@@ -28,25 +28,26 @@ const STATUS_STYLE: Record<string, { color: string; label: string }> = {
 
 export default function RecentTransactions({
   transactions,
-  onClearAll,
-  clearing,
+  onArchive,
 }: {
   transactions: OrderRow[];
-  onClearAll: () => Promise<void>;
-  clearing: boolean;
+  onArchive: (id: string, archived: boolean) => Promise<boolean>;
 }) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
-  const [confirmClear, setConfirmClear] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
-  const filtersActive = search.trim() !== "" || statusFilter !== "ALL";
+  const filtersActive = search.trim() !== "" || statusFilter !== "ALL" || showArchived;
 
   const resetFilters = () => {
     setSearch("");
     setStatusFilter("ALL");
+    setShowArchived(false);
   };
 
   const filtered = transactions.filter(t => {
+    if (!!t.archived_at !== showArchived) return false;
     if (statusFilter !== "ALL" && t.status !== statusFilter) return false;
     if (search.trim()) {
       const q = search.trim().toLowerCase();
@@ -54,9 +55,19 @@ export default function RecentTransactions({
     }
     return true;
   });
+  const printTransactions = () => {
+    const clearPrintTarget = () => {
+      delete document.body.dataset.adminPrint;
+      window.removeEventListener("afterprint", clearPrintTarget);
+    };
+    document.body.dataset.adminPrint = "transactions";
+    window.addEventListener("afterprint", clearPrintTarget);
+    window.print();
+  };
 
   return (
-    <div>
+    <div className="recent-transactions-print-area">
+      <h2 className="print-only" style={{ fontFamily: "'Barlow', sans-serif", fontSize: 20, color: "#111" }}>Recent Transactions{showArchived ? " — Archived" : ""}</h2>
       {/* Toolbar */}
       <div className="no-print" style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
         <input
@@ -81,14 +92,18 @@ export default function RecentTransactions({
           </button>
         )}
         <div style={{ flex: 1 }} />
-        <button onClick={() => setConfirmClear(true)} disabled={clearing || transactions.length === 0}
-          style={{ background: `${RED}12`, border: `1px solid ${RED}44`, borderRadius: 7, padding: "8px 14px", fontFamily: "'Barlow', sans-serif", fontSize: 12, fontWeight: 600, color: RED, cursor: transactions.length === 0 ? "default" : "pointer", opacity: transactions.length === 0 ? 0.5 : 1 }}>
-          {clearing ? "Clearing…" : "Clear All Data"}
+        <button onClick={() => setShowArchived(value => !value)}
+          style={{ background: showArchived ? `${BLUE}18` : "transparent", border: `1px solid ${showArchived ? `${BLUE}66` : BORDER}`, borderRadius: 7, padding: "8px 14px", fontFamily: "'Barlow', sans-serif", fontSize: 12, fontWeight: 600, color: showArchived ? BLUE : TEXT_MUTED, cursor: "pointer" }}>
+          {showArchived ? "View Active" : "View Archived"}
+        </button>
+        <button onClick={printTransactions} disabled={filtered.length === 0}
+          style={{ background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 7, padding: "8px 14px", fontFamily: "'Barlow', sans-serif", fontSize: 12, fontWeight: 600, color: TEXT_MUTED, cursor: filtered.length === 0 ? "default" : "pointer", opacity: filtered.length === 0 ? 0.5 : 1 }}>
+          Print
         </button>
       </div>
 
       {/* Table */}
-      <div style={{ overflowX: "auto" }}>
+      <div className="recent-transactions-table" style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
           <thead>
             <tr style={{ background: CARD }}>
@@ -97,6 +112,7 @@ export default function RecentTransactions({
               <th style={thStyle}>Date</th>
               <th style={{ ...thStyle, textAlign: "right" }}>Amount</th>
               <th style={thStyle}>Status</th>
+              <th className="no-print" style={thStyle}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -111,42 +127,27 @@ export default function RecentTransactions({
                   <td style={{ padding: "10px 14px" }}>
                     <span style={{ fontFamily: "'Barlow', sans-serif", fontSize: 11, fontWeight: 700, color: st.color, background: `${st.color}18`, borderRadius: 4, padding: "3px 9px" }}>{st.label}</span>
                   </td>
+                  <td className="no-print" style={{ padding: "8px 14px" }}>
+                    <button disabled={busyId === t.id} onClick={async () => {
+                      setBusyId(t.id);
+                      try { await onArchive(t.id, !showArchived); }
+                      finally { setBusyId(null); }
+                    }} style={{ background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 6, padding: "5px 9px", color: showArchived ? BLUE : TEXT_MUTED, fontFamily: "'Barlow', sans-serif", fontSize: 11, fontWeight: 600, cursor: busyId === t.id ? "wait" : "pointer" }}>
+                      {busyId === t.id ? "Saving…" : showArchived ? "Restore" : "Archive"}
+                    </button>
+                  </td>
                 </tr>
               );
             })}
             {filtered.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: "36px 0", textAlign: "center", fontFamily: "'Barlow', sans-serif", fontSize: 13, color: TEXT_MUTED }}>
-                {transactions.length === 0 ? "No transactions in this period yet." : "No transactions match your filters."}
+              <tr><td colSpan={6} style={{ padding: "36px 0", textAlign: "center", fontFamily: "'Barlow', sans-serif", fontSize: 13, color: TEXT_MUTED }}>
+                {transactions.length === 0 ? "No transactions in this period yet." : `No ${showArchived ? "archived" : "active"} transactions match your filters.`}
               </td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Destructive confirm dialog */}
-      {confirmClear && (
-        <div className="no-print" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
-          <div style={{ width: "100%", maxWidth: 420, background: SURFACE, borderRadius: 14, border: `1px solid ${BORDER}`, overflow: "hidden" }}>
-            <div style={{ padding: "28px 28px 24px", textAlign: "center" }}>
-              <div style={{ width: 52, height: 52, borderRadius: "50%", background: `${RED}18`, border: `1.5px solid ${RED}44`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={RED} strokeWidth={2.5} strokeLinecap="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /><path d="M10 11v6M14 11v6" /></svg>
-              </div>
-              <h3 style={{ fontFamily: "'Barlow', sans-serif", fontSize: 17, fontWeight: 700, color: TEXT, marginBottom: 8 }}>Clear All Revenue Data?</h3>
-              <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 13, color: TEXT_MUTED, lineHeight: 1.6 }}>
-                This permanently deletes <strong style={{ color: TEXT }}>every order record</strong> — including paid, pending, and refunded orders. This cannot be undone. Product listings are not affected.
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: 10, padding: "0 20px 20px" }}>
-              <button onClick={() => setConfirmClear(false)} style={{ flex: 1, padding: "11px 0", background: "transparent", border: `1px solid ${BORDER}`, borderRadius: 8, fontFamily: "'Barlow', sans-serif", fontSize: 14, fontWeight: 600, color: TEXT_MUTED, cursor: "pointer" }}>
-                Cancel
-              </button>
-              <button onClick={async () => { setConfirmClear(false); await onClearAll(); }} style={{ flex: 1, padding: "11px 0", background: RED, border: "none", borderRadius: 8, fontFamily: "'Barlow', sans-serif", fontSize: 14, fontWeight: 700, color: "#fff", cursor: "pointer", boxShadow: `0 3px 10px ${RED}44` }}>
-                Delete Everything
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -41,6 +41,7 @@ export interface OrderRecord {
   created_at: string;
   status: OrderStatus;
   cancellation_reason?: CancellationReason | null;
+  archived_at?: string | null;
   order_type: OrderType;
   payment_option: PaymentOption | null;
   total: number;

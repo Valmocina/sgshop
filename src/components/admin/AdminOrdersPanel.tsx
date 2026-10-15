@@ -6,7 +6,7 @@ import { stepIndex } from "@/lib/preorder";
 
 const peso = (n: number) => `₱${Number(n).toLocaleString()}`;
 
-type Filter = "to_order" | "in_progress" | "delivery_scheduled" | "delivered" | "stock" | "unpaid" | "all";
+type Filter = "to_order" | "in_progress" | "delivery_scheduled" | "delivered" | "stock" | "unpaid" | "archived" | "all";
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "to_order", label: "Needs supplier order" },
   { key: "in_progress", label: "In progress" },
@@ -14,11 +14,14 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "delivered", label: "Delivered" },
   { key: "stock", label: "In-stock orders" },
   { key: "unpaid", label: "Unpaid / failed" },
+  { key: "archived", label: "Archived" },
   { key: "all", label: "All" },
 ];
 
 const isPaid = (o: OrderRecord) => o.status === "paid" || o.status === "deposit_paid";
 const matches = (o: OrderRecord, f: Filter) => {
+  if (f === "archived") return !!o.archived_at;
+  if (o.archived_at) return false;
   const pre = o.order_type === "preorder";
   switch (f) {
     case "to_order": return pre && isPaid(o) && o.fulfillment_status === "awaiting_order";
@@ -122,6 +125,16 @@ function OrderCard({ order, onSave, busy }: {
           <span style={{ ...af(11, 700), color: st.color, background: `${st.color}18`, borderRadius: 4, padding: "3px 9px" }}>
             {order.status === "cancelled" ? (order.cancellation_reason === "customer_cancelled" ? "Customer Cancelled" : order.cancellation_reason === "admin_rejected" ? "Admin Rejected" : order.cancellation_reason === "admin_cancelled" ? "Admin Cancelled" : "Cancelled") : st.label}
           </span>
+          {(order.fulfillment_status === "delivered" || order.archived_at) && (
+            <button className="admin-order-button no-print" disabled={busy} onClick={() => onSave(
+              order.id,
+              { archived_at: order.archived_at ? null : new Date().toISOString() },
+              order.archived_at ? "Order restored from archive" : "Delivered order archived",
+            )}
+              style={{ padding: "5px 10px", background: "transparent", border: `1px solid ${A.border}`, borderRadius: 6, ...af(11, 600), color: A.textMuted, cursor: busy ? "wait" : "pointer" }}>
+              {order.archived_at ? "Restore" : "Archive"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -275,6 +288,15 @@ export function AdminOrdersPanel({ showToast, onChanged }: {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("to_order");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const printDeliveredOrders = () => {
+    const clearPrintTarget = () => {
+      delete document.body.dataset.adminPrint;
+      window.removeEventListener("afterprint", clearPrintTarget);
+    };
+    document.body.dataset.adminPrint = "delivered";
+    window.addEventListener("afterprint", clearPrintTarget);
+    window.print();
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -324,16 +346,21 @@ export function AdminOrdersPanel({ showToast, onChanged }: {
   const shown = orders.filter(o => matches(o, filter));
 
   return (
-    <div style={{ padding: "28px" }}>
+    <div className="admin-orders-print-area" style={{ padding: "28px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6, gap: 12, flexWrap: "wrap" }}>
         <h1 style={{ ...af(22, 700), color: A.text }}>Orders</h1>
-        <button className="admin-order-button" onClick={load} style={{ padding: "8px 14px", background: "transparent", border: `1px solid ${A.border}`, borderRadius: 7, ...af(13, 600), color: A.textMuted, cursor: "pointer" }}>Refresh</button>
+        <div className="no-print" style={{ display: "flex", gap: 8 }}>
+          {(filter === "delivered" || filter === "archived") && (
+            <button className="admin-order-button" onClick={printDeliveredOrders} style={{ padding: "8px 14px", background: "transparent", border: `1px solid ${A.border}`, borderRadius: 7, ...af(13, 600), color: A.textMuted, cursor: "pointer" }}>Print Items</button>
+          )}
+          <button className="admin-order-button" onClick={load} style={{ padding: "8px 14px", background: "transparent", border: `1px solid ${A.border}`, borderRadius: 7, ...af(13, 600), color: A.textMuted, cursor: "pointer" }}>Refresh</button>
+        </div>
       </div>
-      <p style={{ ...af(13, 400), color: A.textMuted, marginBottom: 18, lineHeight: 1.6 }}>
+      <p className="no-print" style={{ ...af(13, 400), color: A.textMuted, marginBottom: 18, lineHeight: 1.6 }}>
         Lifesize figures aren't stocked. When a customer pre-orders and pays, it lands under <strong style={{ color: A.text }}>Needs supplier order</strong> — place the order with your supplier, then mark it here and keep the progress and arrival estimate up to date.
       </p>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
+      <div className="no-print" style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 18 }}>
         {FILTERS.map(f => {
           const active = filter === f.key;
           const urgent = f.key === "to_order" && counts.to_order > 0;

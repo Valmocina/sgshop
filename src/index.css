@@ -39,6 +39,49 @@ input[type="number"]::-webkit-outer-spin-button {
   outline-offset: 2px;
 }
 
+.print-only {
+  display: none;
+}
+
+@media print {
+  body[data-admin-print] * {
+    visibility: hidden !important;
+  }
+
+  body[data-admin-print="revenue"] .revenue-print-area,
+  body[data-admin-print="revenue"] .revenue-print-area *,
+  body[data-admin-print="transactions"] .recent-transactions-print-area,
+  body[data-admin-print="transactions"] .recent-transactions-print-area *,
+  body[data-admin-print="delivered"] .admin-orders-print-area,
+  body[data-admin-print="delivered"] .admin-orders-print-area * {
+    visibility: visible !important;
+    color: #111 !important;
+    background: #fff !important;
+    border-color: #ccc !important;
+  }
+
+  body[data-admin-print="revenue"] .revenue-print-area,
+  body[data-admin-print="transactions"] .recent-transactions-print-area,
+  body[data-admin-print="delivered"] .admin-orders-print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    padding: 16px;
+  }
+
+  body[data-admin-print] .no-print,
+  body[data-admin-print] button,
+  body[data-admin-print] input,
+  body[data-admin-print] select,
+  body[data-admin-print] textarea {
+    display: none !important;
+  }
+
+  body[data-admin-print] .print-only {
+    display: block !important;
+  }
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }

@@ -61,6 +61,7 @@ create table public.orders (
     check (status in ('pending','paid','deposit_paid','failed','cancelled','refunded')),
   cancellation_reason text
     check (cancellation_reason in ('customer_cancelled','admin_cancelled','admin_rejected')),
+  archived_at timestamptz,
   order_type text not null default 'stock' check (order_type in ('stock','preorder')),
   payment_option text check (payment_option in ('full','deposit')),
   total numeric(10,2) not null,                  -- full order value
@@ -107,6 +108,7 @@ create policy "orders_insert_public" on public.orders for insert to anon, authen
     and review_status = 'pending'
     and (fulfillment_status is null or fulfillment_status = 'awaiting_order')
     and supplier_ref is null and admin_notes is null and ordered_at is null
+    and archived_at is null
   );
 create policy "order_items_insert_public" on public.order_items for insert to anon, authenticated
   with check (true);
@@ -306,6 +308,21 @@ begin
 end $$;
 create trigger orders_guard_trg before update on public.orders
 for each row execute function public.orders_guard();
+
+create or replace function public.orders_archive_admin_only() returns trigger
+language plpgsql as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Only admins can archive orders';
+  end if;
+  return new;
+end $$;
+
+create trigger orders_archive_admin_only_trg
+before update of archived_at on public.orders
+for each row
+when (new.archived_at is distinct from old.archived_at)
+execute function public.orders_archive_admin_only();
 
 create or replace function public.orders_require_full_payment_for_delivery() returns trigger
 language plpgsql as $$

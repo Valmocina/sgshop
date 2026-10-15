@@ -3,17 +3,19 @@ import { C, A, font, af } from "@/lib/theme";
 import { AField } from "@/components/admin/AField";
 import { AInput } from "@/components/admin/AInput";
 
-export function AdminSettingsPanel({ adminEmail, onChangeAdminPassword, paymongoPublicKey, onChangePaymongoKey, showToast }: {
+export function AdminSettingsPanel({ adminEmail, onChangeAdminPassword, paymongoPublicKey, onChangePaymongoKey, onArchiveAllOrders, showToast }: {
   adminEmail: string;
   onChangeAdminPassword: (oldPass: string, newPass: string) => Promise<{ ok: boolean; error?: string }>;
   paymongoPublicKey: string;
   onChangePaymongoKey: (k: string) => void;
+  onArchiveAllOrders: () => Promise<boolean>;
   showToast: (msg: string, type?: "success" | "error") => void;
 }) {
   const [oldPass, setOldPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [confirmPass, setConfirmPass] = useState("");
   const [busy, setBusy] = useState(false);
+  const [archiving, setArchiving] = useState(false);
 
   const saveAdminPassword = async () => {
     if (!oldPass) { showToast("Enter your current password.", "error"); return; }
@@ -86,7 +88,24 @@ export function AdminSettingsPanel({ adminEmail, onChangeAdminPassword, paymongo
           shipped to the browser) — not implemented in this pass. Let me know if you want that added.
         </p>
       </div>
+
+      <div style={{ background: A.surface, border: `1px solid ${A.border}`, borderRadius: 12, padding: "24px 24px", marginTop: 24 }}>
+        <h2 style={{ ...af(16, 700), color: A.text, marginBottom: 8 }}>Order Archive</h2>
+        <p style={{ ...af(13, 400), color: A.textMuted, lineHeight: 1.7, marginBottom: 16 }}>
+          Archive all current orders to clear them from the active order and transaction lists. Archived orders are preserved and can be viewed or restored later.
+        </p>
+        <button disabled={archiving} onClick={async () => {
+          if (!window.confirm("Archive all current orders? This preserves the records and they can be restored later.")) return;
+          setArchiving(true);
+          try {
+            await onArchiveAllOrders();
+          } finally {
+            setArchiving(false);
+          }
+        }} style={{ background: `${A.gold}18`, border: `1px solid ${A.gold}66`, borderRadius: 8, padding: "10px 18px", ...af(13, 700), color: A.gold, cursor: archiving ? "wait" : "pointer", opacity: archiving ? 0.65 : 1 }}>
+          {archiving ? "Archiving…" : "Archive All Orders"}
+        </button>
+      </div>
     </div>
   );
 }
-
