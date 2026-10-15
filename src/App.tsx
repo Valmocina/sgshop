@@ -260,9 +260,11 @@ export default function App() {
   // ── Order persistence (real orders in Supabase, used by the Revenue + Orders tabs) ──
   const createPendingOrder = async ({ product, qty, method, preorder, paymentOption, contact, customer }: CreateOrderArgs): Promise<string> => {
     const option: PaymentOption = preorder ? paymentOption : "full";
-    const { data: order, error: orderErr } = await supabase
+    const orderId = crypto.randomUUID();
+    const { error: orderErr } = await supabase
       .from("orders")
       .insert({
+        id: orderId,
         customer_id: customer?.id ?? null,
         customer_name: customer?.name || contact.name || "Guest",
         customer_email: customer?.email || contact.email || null,
@@ -277,16 +279,14 @@ export default function App() {
         // Pre-orders enter the admin's "needs supplier order" queue once they're paid.
         fulfillment_status: preorder ? "awaiting_order" : null,
         est_arrival: preorder ? product.est_arrival ?? null : null,
-      })
-      .select("id")
-      .single();
+      });
 
-    if (orderErr || !order) {
-      throw new Error(orderErr?.message || "Could not create order.");
+    if (orderErr) {
+      throw new Error(orderErr.message || "Could not create order.");
     }
 
     const { error: itemErr } = await supabase.from("order_items").insert({
-      order_id: order.id,
+      order_id: orderId,
       product_id: product.id,
       product_name: product.name,
       category: product.category,
@@ -298,7 +298,7 @@ export default function App() {
       console.error("Failed to record order item:", itemErr);
     }
 
-    return order.id as string;
+    return orderId;
   };
 
   const markOrderStatus = async (
