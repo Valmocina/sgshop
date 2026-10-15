@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { OrderRecord, FulfillmentStatus } from "@/types/store";
+import type { OrderRecord, FulfillmentStatus, ReviewStatus } from "@/types/store";
 import { A, af } from "@/lib/theme";
-import { FULFILLMENT_STEPS, stepIndex } from "@/lib/preorder";
+import { stepIndex } from "@/lib/preorder";
 
 const peso = (n: number) => `₱${Number(n).toLocaleString()}`;
 
@@ -22,8 +22,8 @@ const matches = (o: OrderRecord, f: Filter) => {
   const pre = o.order_type === "preorder";
   switch (f) {
     case "to_order": return pre && isPaid(o) && o.fulfillment_status === "awaiting_order";
-    case "in_progress": return pre && isPaid(o) && ["ordered", "in_transit", "arrived"].includes(o.fulfillment_status ?? "");
-    case "delivery_scheduled": return !!o.delivery_date && o.fulfillment_status !== "delivered";
+    case "in_progress": return pre && isPaid(o) && ["ordered", "in_transit", "arrived", "scheduled_delivery"].includes(o.fulfillment_status ?? "");
+    case "delivery_scheduled": return !!o.delivery_date && isPaid(o) && o.fulfillment_status === "scheduled_delivery";
     case "delivered": return pre && isPaid(o) && o.fulfillment_status === "delivered";
     case "stock": return !pre && isPaid(o);
     case "unpaid": return o.status === "pending" || o.status === "failed" || o.status === "cancelled";
@@ -48,28 +48,27 @@ const labelStyle: React.CSSProperties = { ...af(11, 700, 0.5), color: A.textMute
 
 function OrderCard({ order, onSave, busy }: {
   order: OrderRecord;
-  onSave: (id: string, changes: Partial<OrderRecord>, successMsg: string) => Promise<void>;
+  onSave: (id: string, changes: Partial<OrderRecord>, successMsg: string) => Promise<boolean>;
   busy: boolean;
 }) {
   const pre = order.order_type === "preorder";
   const st = STATUS_STYLE[order.status] ?? { label: order.status, color: A.textMuted };
   const balance = Math.max(0, order.total - order.amount_paid);
 
-  const [fulfillment, setFulfillment] = useState<FulfillmentStatus>(order.fulfillment_status ?? "awaiting_order");
   const [eta, setEta] = useState(order.est_arrival ?? "");
   const [ref, setRef] = useState(order.supplier_ref ?? "");
   const [notes, setNotes] = useState(order.admin_notes ?? "");
   const [courier, setCourier] = useState(order.courier_name ?? "");
   const [tracking, setTracking] = useState(order.tracking_number ?? "");
-  const [review, setReview] = useState(order.review_status ?? "accepted");
+  const [review, setReview] = useState<ReviewStatus>(order.review_status ?? "pending");
+  const [savingReview, setSavingReview] = useState<ReviewStatus | null>(null);
+  const [manageProgress, setManageProgress] = useState(false);
 
-  const dirty = fulfillment !== (order.fulfillment_status ?? "awaiting_order")
-    || eta !== (order.est_arrival ?? "")
+  const dirty = eta !== (order.est_arrival ?? "")
     || ref !== (order.supplier_ref ?? "")
     || notes !== (order.admin_notes ?? "")
     || courier !== (order.courier_name ?? "")
-    || tracking !== (order.tracking_number ?? "")
-    || review !== (order.review_status ?? "accepted");
+    || tracking !== (order.tracking_number ?? "");
 
   const details = () => ({
     est_arrival: eta.trim() || null,
@@ -77,8 +76,32 @@ function OrderCard({ order, onSave, busy }: {
     admin_notes: notes.trim() || null,
     courier_name: courier.trim() || null,
     tracking_number: tracking.trim() || null,
-    review_status: review,
   });
+  const workflowActive = isPaid(order) && order.status !== "cancelled" && review === "accepted";
+  const canAdminCancel = isPaid(order) && order.status !== "cancelled";
+  const nextProgress: { status: FulfillmentStatus; label: string } | null = ({
+    awaiting_order: { status: "ordered", label: "Mark ordered from supplier" },
+    ordered: { status: "in_transit", label: "Mark in transit" },
+    in_transit: { status: "arrived", label: "Mark arrived" },
+    scheduled_delivery: { status: "delivered", label: "Mark delivered" },
+  } as Partial<Record<FulfillmentStatus, { status: FulfillmentStatus; label: string }>>)[order.fulfillment_status ?? "awaiting_order"] ?? null;
+  const updateReview = async (status: ReviewStatus) => {
+    if (busy || savingReview || order.status === "cancelled" || order.fulfillment_status !== "awaiting_order" || status === review) return;
+    const changes: Partial<OrderRecord> = { review_status: status };
+    if (status === "rejected") {
+      changes.status = "cancelled";
+      changes.cancellation_reason = "admin_rejected";
+      changes.delivery_date = null;
+      changes.delivery_time_slot = null;
+    }
+    setSavingReview(status);
+    try {
+      const saved = await onSave(order.id, changes, status === "rejected" ? "Pre-order rejected" : `Pre-order marked ${status === "pending" ? "under review" : "accepted"}`);
+      if (saved) setReview(status);
+    } finally {
+      setSavingReview(null);
+    }
+  };
 
   return (
     <div style={{ background: A.surface, border: `1px solid ${A.border}`, borderRadius: 12, padding: "18px 20px" }}>
@@ -95,7 +118,9 @@ function OrderCard({ order, onSave, busy }: {
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "flex-start", flexWrap: "wrap" }}>
           <span style={{ ...af(11, 700), color: pre ? A.gold : A.textMuted, background: pre ? `${A.gold}18` : A.card, borderRadius: 4, padding: "3px 9px" }}>{pre ? "PRE-ORDER" : "IN STOCK"}</span>
-          <span style={{ ...af(11, 700), color: st.color, background: `${st.color}18`, borderRadius: 4, padding: "3px 9px" }}>{st.label}</span>
+          <span style={{ ...af(11, 700), color: st.color, background: `${st.color}18`, borderRadius: 4, padding: "3px 9px" }}>
+            {order.status === "cancelled" ? (order.cancellation_reason === "customer_cancelled" ? "Customer Cancelled" : order.cancellation_reason === "admin_rejected" ? "Admin Rejected" : order.cancellation_reason === "admin_cancelled" ? "Admin Cancelled" : "Cancelled") : st.label}
+          </span>
         </div>
       </div>
 
@@ -116,7 +141,7 @@ function OrderCard({ order, onSave, busy }: {
       </div>
 
       {/* Customer-Scheduled Delivery Banner */}
-      {order.delivery_date && (
+      {order.delivery_date && isPaid(order) && (
         <div style={{ background: `${A.gold}15`, border: `1px solid ${A.gold}44`, borderRadius: 8, padding: "10px 14px", marginBottom: 14 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
             <span style={{ ...af(12, 700), color: A.gold, textTransform: "uppercase" }}>
@@ -125,20 +150,20 @@ function OrderCard({ order, onSave, busy }: {
             <span style={{ ...af(12, 600), color: A.text }}>
               Slot: {order.delivery_time_slot || "Standard Daytime"}
             </span>
+            <span style={{ ...af(11, 700), color: A.green, textTransform: "uppercase" }}>
+              Delivery status: {order.fulfillment_status === "delivered" ? "Delivered" : "Scheduled"}
+            </span>
           </div>
         </div>
       )}
+      {pre && isPaid(order) && order.status !== "cancelled" && order.fulfillment_status === "arrived" && !order.delivery_date && (
+        <p style={{ ...af(13, 600), color: A.gold, marginBottom: 14 }}>Waiting for customer to schedule delivery.</p>
+      )}
 
       {/* Pre-order fulfilment & dispatch controls */}
-      {pre && isPaid(order) && (
+      {pre && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 12 }}>
-            <div>
-              <label style={labelStyle}>Progress</label>
-              <select value={fulfillment} onChange={e => setFulfillment(e.target.value as FulfillmentStatus)} style={{ ...inputStyle, cursor: "pointer" }}>
-                {FULFILLMENT_STEPS.map(s => <option key={s.key} value={s.key}>{s.admin}</option>)}
-              </select>
-            </div>
             <div>
               <label style={labelStyle}>Estimated arrival</label>
               <input value={eta} onChange={e => setEta(e.target.value)} placeholder="e.g. 10–12 weeks" style={inputStyle} />
@@ -147,13 +172,25 @@ function OrderCard({ order, onSave, busy }: {
               <label style={labelStyle}>Supplier order ref</label>
               <input value={ref} onChange={e => setRef(e.target.value)} placeholder="PO / tracking no." style={inputStyle} />
             </div>
-            <div>
-              <label style={labelStyle}>Pre-order Review</label>
-              <select value={review} onChange={e => setReview(e.target.value as any)} style={{ ...inputStyle, cursor: "pointer" }}>
-                <option value="accepted">Accepted</option>
-                <option value="pending">Needs Review</option>
-                <option value="rejected">Rejected</option>
-              </select>
+          </div>
+
+          <div style={{ marginBottom: 14 }}>
+            <label style={labelStyle}>Pre-order Review</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {([
+                ["pending", "Under Review"],
+                ["accepted", "Accepted"],
+                ["rejected", "Rejected"],
+              ] as [ReviewStatus, string][]).map(([status, label]) => (
+                <button key={status} disabled={busy || !!savingReview || order.status === "cancelled" || order.fulfillment_status !== "awaiting_order"} onClick={() => updateReview(status)} style={{
+                  padding: "8px 13px", borderRadius: 7, border: `1px solid ${review === status ? A.gold : A.border}`,
+                  background: review === status ? `${A.gold}22` : "transparent", ...af(12, 700),
+                  color: review === status ? A.gold : A.textMuted, cursor: busy || savingReview || order.status === "cancelled" || order.fulfillment_status !== "awaiting_order" ? "not-allowed" : "pointer",
+                  opacity: busy || savingReview || order.status === "cancelled" || order.fulfillment_status !== "awaiting_order" ? 0.65 : 1,
+                }}>
+                  {savingReview === status ? "Saving…" : label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -172,22 +209,34 @@ function OrderCard({ order, onSave, busy }: {
           <textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Only visible to staff — delivery arrangements, supplier notes…" rows={2}
             style={{ ...inputStyle, resize: "vertical", marginBottom: 14 }} />
 
+          {workflowActive && (
+            <div style={{ marginBottom: 12 }}>
+              <button onClick={() => setManageProgress(value => !value)} style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${A.gold}`, borderRadius: 8, ...af(13, 700), color: A.gold, cursor: "pointer" }}>
+                {manageProgress ? "Close Progress" : "Manage Progress"}
+              </button>
+              {manageProgress && (
+                <div style={{ marginTop: 10, padding: "12px 14px", background: A.card, border: `1px solid ${A.border}`, borderRadius: 8 }}>
+                  {order.fulfillment_status === "arrived" && !order.delivery_date ? (
+                    <p style={{ ...af(13, 600), color: A.gold }}>Waiting for customer to schedule delivery.</p>
+                  ) : nextProgress && (
+                    <button disabled={busy || (nextProgress.status === "delivered" && (!order.delivery_date || !order.delivery_time_slot))} onClick={() => {
+                      const changes: Partial<OrderRecord> = { ...details(), fulfillment_status: nextProgress.status };
+                      if (nextProgress.status === "ordered") changes.ordered_at = new Date().toISOString();
+                      onSave(order.id, changes, nextProgress.label);
+                    }}
+                      style={{ padding: "9px 16px", background: `linear-gradient(135deg, ${A.gold}, ${A.goldDark})`, border: "none", borderRadius: 8, ...af(13, 700), color: "#111", cursor: busy ? "wait" : "pointer", opacity: busy ? 0.6 : 1 }}>
+                      {nextProgress.label}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
-            {order.fulfillment_status === "awaiting_order" && (
-              <button disabled={busy} onClick={() => onSave(order.id, { ...details(), fulfillment_status: "ordered", ordered_at: new Date().toISOString() }, "Marked as ordered from supplier")}
-                style={{ padding: "9px 16px", background: `linear-gradient(135deg, ${A.gold}, ${A.goldDark})`, border: "none", borderRadius: 8, ...af(13, 700), color: "#111", cursor: "pointer", opacity: busy ? 0.6 : 1 }}>
-                Mark ordered from supplier
-              </button>
-            )}
-            {order.fulfillment_status === "arrived" && order.delivery_date && (
-              <button disabled={busy} onClick={() => onSave(order.id, { ...details(), fulfillment_status: "delivered" }, "Marked as delivered")}
-                style={{ padding: "9px 16px", background: `${A.green}20`, border: `1px solid ${A.green}77`, borderRadius: 8, ...af(13, 700), color: A.green, cursor: "pointer" }}>
-                Mark White-Glove Delivered by Supervisor & Courier ✓
-              </button>
-            )}
-            <button disabled={busy || !dirty} onClick={() => onSave(order.id, { ...details(), fulfillment_status: fulfillment }, "Order updated")}
+            <button disabled={busy || !dirty} onClick={() => onSave(order.id, details(), "Order details updated")}
               style={{ padding: "9px 16px", background: "transparent", border: `1px solid ${dirty ? A.gold : A.border}`, borderRadius: 8, ...af(13, 600), color: dirty ? A.gold : A.textMuted, cursor: dirty ? "pointer" : "default" }}>
-              Save changes
+              Save details
             </button>
             {order.status === "deposit_paid" && (
               <button disabled={busy} onClick={() => {
@@ -196,6 +245,15 @@ function OrderCard({ order, onSave, busy }: {
               }}
                 style={{ padding: "9px 16px", background: `${A.green}18`, border: `1px solid ${A.green}55`, borderRadius: 8, ...af(13, 600), color: A.green, cursor: "pointer" }}>
                 Mark balance received ({peso(balance)})
+              </button>
+            )}
+            {canAdminCancel && (
+              <button disabled={busy} onClick={() => {
+                if (window.confirm("Cancel this order? Any payment already received will remain recorded and will not be refunded automatically."))
+                  onSave(order.id, { status: "cancelled", cancellation_reason: "admin_cancelled", delivery_date: null, delivery_time_slot: null }, "Order cancelled by admin");
+              }}
+                style={{ padding: "9px 16px", background: `${A.red}18`, border: `1px solid ${A.red}55`, borderRadius: 8, ...af(13, 600), color: A.red, cursor: busy ? "wait" : "pointer" }}>
+                Cancel Order
               </button>
             )}
             {stepIndex(order.fulfillment_status) >= 0 && order.ordered_at && (
@@ -233,15 +291,30 @@ export function AdminOrdersPanel({ showToast, onChanged }: {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const refreshOnFocus = () => { void load(); };
+    window.addEventListener("focus", refreshOnFocus);
+    return () => window.removeEventListener("focus", refreshOnFocus);
+  }, [load]);
 
   const save = async (id: string, changes: Partial<OrderRecord>, successMsg: string) => {
     setBusyId(id);
-    const { error: err } = await supabase.from("orders").update(changes).eq("id", id);
-    setBusyId(null);
-    if (err) { showToast(`Couldn't save: ${err.message}`, "error"); return; }
-    setOrders(prev => prev.map(o => (o.id === id ? { ...o, ...changes } : o)));
-    showToast(successMsg);
-    onChanged?.();
+    try {
+      const { data, error: err } = await supabase.from("orders").update(changes).eq("id", id).select("id").maybeSingle();
+      if (err || !data) {
+        showToast(`Couldn't save: ${err?.message ?? "Order no longer exists or is unavailable."}`, "error");
+        return false;
+      }
+      setOrders(prev => prev.map(o => (o.id === id ? { ...o, ...changes } : o)));
+      showToast(successMsg);
+      onChanged?.();
+      return true;
+    } catch (err) {
+      showToast(`Couldn't save: ${err instanceof Error ? err.message : "Unexpected error."}`, "error");
+      return false;
+    } finally {
+      setBusyId(null);
+    }
   };
 
   const counts = useMemo(() => {
@@ -266,7 +339,7 @@ export function AdminOrdersPanel({ showToast, onChanged }: {
           const active = filter === f.key;
           const urgent = f.key === "to_order" && counts.to_order > 0;
           return (
-            <button key={f.key} onClick={() => setFilter(f.key)} style={{
+            <button key={f.key} onClick={() => { setFilter(f.key); void load(); }} style={{
               padding: "8px 14px", borderRadius: 20, cursor: "pointer", ...af(13, active ? 700 : 500),
               background: active ? `${A.gold}18` : A.card, color: active ? A.gold : A.textMuted,
               border: `1px solid ${active ? A.gold : urgent ? `${A.gold}66` : A.border}`,
@@ -286,7 +359,7 @@ export function AdminOrdersPanel({ showToast, onChanged }: {
         </p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {shown.map(o => <OrderCard key={`${o.id}:${o.fulfillment_status}:${o.status}`} order={o} onSave={save} busy={busyId === o.id} />)}
+          {shown.map(o => <OrderCard key={`${o.id}:${o.fulfillment_status}:${o.status}:${o.review_status}`} order={o} onSave={save} busy={busyId === o.id} />)}
         </div>
       )}
     </div>

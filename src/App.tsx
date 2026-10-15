@@ -126,7 +126,17 @@ export default function App() {
       password,
       options: { data: { name } },
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      const unavailablePhoneSignUp =
+        identifier.startsWith("+63") &&
+        error.message.toLowerCase().includes("phone signups are disabled");
+      return {
+        ok: false,
+        error: unavailablePhoneSignUp
+          ? "Phone sign-up is currently unavailable."
+          : error.message,
+      };
+    }
     if (!data.session) return { ok: true, needsConfirmation: true };
     return { ok: true };
   };

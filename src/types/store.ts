@@ -31,14 +31,16 @@ export type PaymentOption = "full" | "deposit";
 export type OrderStatus = "pending" | "paid" | "deposit_paid" | "failed" | "cancelled" | "refunded";
 
 // Admin-side progress of a pre-order, after the customer has paid.
-export type FulfillmentStatus = "awaiting_order" | "ordered" | "in_transit" | "arrived" | "delivered";
+export type FulfillmentStatus = "awaiting_order" | "ordered" | "in_transit" | "arrived" | "scheduled_delivery" | "delivered";
 
 export type ReviewStatus = "pending" | "accepted" | "rejected";
+export type CancellationReason = "customer_cancelled" | "admin_cancelled" | "admin_rejected";
 
 export interface OrderRecord {
   id: string;
   created_at: string;
   status: OrderStatus;
+  cancellation_reason?: CancellationReason | null;
   order_type: OrderType;
   payment_option: PaymentOption | null;
   total: number;
@@ -64,4 +66,3 @@ export interface OrderRecord {
 }
 export interface ContactInfo { name: string; email: string; phone: string }
 export type PayMethod = "gcash" | "maya";
-

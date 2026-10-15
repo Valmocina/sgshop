@@ -12,7 +12,6 @@ const STATUS_LABEL: Record<string, { text: string; color: string }> = {
   paid: { text: "Paid", color: "#22c55e" },
   deposit_paid: { text: "Deposit paid", color: C.gold },
   refunded: { text: "Refunded", color: "#eab308" },
-  cancelled: { text: "Cancelled", color: "#ef4444" },
 };
 
 function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => void }) {
@@ -21,32 +20,106 @@ function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => v
   const [selectedDate, setSelectedDate] = useState(order.delivery_date ?? "");
   const [selectedSlot, setSelectedSlot] = useState(order.delivery_time_slot ?? "Morning (9:00 AM - 1:00 PM)");
   const [savingSchedule, setSavingSchedule] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [scheduleMessage, setScheduleMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   const preorder = order.order_type === "preorder";
-  const st = STATUS_LABEL[order.status] ?? { text: order.status, color: C.textMuted };
+  const st = STATUS_LABEL[order.status] ?? {
+    text: order.status === "cancelled" ? "Cancelled" : order.status,
+    color: order.status === "cancelled" ? "#ef4444" : C.textMuted,
+  };
   const balance = Math.max(0, order.total - order.amount_paid);
   const step = stepIndex(order.fulfillment_status);
   const stepName = FULFILLMENT_STEPS[step]?.customer;
   const items = order.order_items ?? [];
   const isArrived = order.fulfillment_status === "arrived";
+  const isScheduled = order.fulfillment_status === "scheduled_delivery";
   const isDelivered = order.fulfillment_status === "delivered";
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDeliveryDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+  const cancelledByCustomer = order.status === "cancelled" && order.cancellation_reason === "customer_cancelled";
+  const canCancel = preorder && ["arrived", "scheduled_delivery"].includes(order.fulfillment_status ?? "")
+    && ["paid", "deposit_paid"].includes(order.status);
 
   const handleConfirmSchedule = async () => {
-    if (!selectedDate) return;
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const minDate = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+    const validSlots = [
+      "Morning (9:00 AM - 1:00 PM)",
+      "Afternoon (1:00 PM - 5:00 PM)",
+      "Evening (5:00 PM - 8:00 PM)",
+    ];
+    if (!selectedDate || selectedDate < minDate || !validSlots.includes(selectedSlot)) {
+      setScheduleMessage({ text: "Choose a valid future delivery date and time slot.", ok: false });
+      return;
+    }
+    if (savingSchedule) return;
     setSavingSchedule(true);
-    const { error } = await supabase
-      .from("orders")
-      .update({
-        delivery_date: selectedDate,
-        delivery_time_slot: selectedSlot,
-      })
-      .eq("id", order.id);
-    setSavingSchedule(false);
-    if (!error) {
+    setScheduleMessage(null);
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .update({
+          delivery_date: selectedDate,
+          delivery_time_slot: selectedSlot,
+        })
+        .eq("id", order.id)
+        .eq("customer_id", order.customer_id)
+        .in("status", ["paid", "deposit_paid"])
+        .eq("fulfillment_status", order.fulfillment_status)
+        .select("id")
+        .maybeSingle();
+      if (error || !data) {
+        setScheduleMessage({
+          text: `Unable to save delivery schedule: ${error?.message ?? "This order can no longer be scheduled."}`,
+          ok: false,
+        });
+        return;
+      }
       setIsScheduling(false);
-      if (onReload) onReload();
-    } else {
-      alert("Unable to save delivery schedule: " + error.message);
+      setScheduleMessage({ text: "Your delivery schedule is confirmed.", ok: true });
+      onReload?.();
+    } catch (error) {
+      setScheduleMessage({
+        text: `Unable to save delivery schedule: ${error instanceof Error ? error.message : "Unexpected error."}`,
+        ok: false,
+      });
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (cancelling || !window.confirm("Cancel this order? Any amount already paid will remain recorded and will not be refunded automatically.")) return;
+    setCancelling(true);
+    setScheduleMessage(null);
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .update({
+          status: "cancelled",
+          cancellation_reason: "customer_cancelled",
+          delivery_date: null,
+          delivery_time_slot: null,
+        })
+        .eq("id", order.id)
+        .eq("customer_id", order.customer_id)
+        .in("status", ["paid", "deposit_paid"])
+        .in("fulfillment_status", ["arrived", "scheduled_delivery"])
+        .select("id")
+        .maybeSingle();
+      if (error || !data) {
+        setScheduleMessage({ text: `Unable to cancel order: ${error?.message ?? "This order can no longer be cancelled."}`, ok: false });
+        return;
+      }
+      setScheduleMessage({ text: "Order cancelled. Any payment already received remains recorded; no automatic refund was made.", ok: true });
+      onReload?.();
+    } catch (error) {
+      setScheduleMessage({ text: `Unable to cancel order: ${error instanceof Error ? error.message : "Unexpected error."}`, ok: false });
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -62,7 +135,9 @@ function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => v
             {preorder && " · Pre-order"}
           </p>
         </div>
-        <span style={{ ...font(11, 800, 1), color: st.color, background: `${st.color}1a`, border: `1px solid ${st.color}55`, borderRadius: 20, padding: "3px 12px", textTransform: "uppercase", whiteSpace: "nowrap" }}>{st.text}</span>
+        <span style={{ ...font(11, 800, 1), color: order.status === "cancelled" ? "#ef4444" : st.color, background: `${order.status === "cancelled" ? "#ef4444" : st.color}1a`, border: `1px solid ${order.status === "cancelled" ? "#ef4444" : st.color}55`, borderRadius: 20, padding: "3px 12px", textTransform: "uppercase", whiteSpace: "nowrap" }}>
+          {order.status === "cancelled" ? (cancelledByCustomer ? "Customer Cancelled" : order.cancellation_reason === "admin_rejected" ? "Admin Rejected" : order.cancellation_reason === "admin_cancelled" ? "Admin Cancelled" : "Cancelled") : st.text}
+        </span>
       </div>
 
       <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginTop: 12 }}>
@@ -73,7 +148,7 @@ function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => v
       </div>
 
       {/* Arrival Confirmation & Delivery Scheduling on Webpage */}
-      {(isArrived || isDelivered) && order.status !== "cancelled" && (
+      {(isArrived || isScheduled || isDelivered) && order.status !== "cancelled" && (
         <div style={{ marginTop: 14, background: isDelivered ? "#16a34a12" : `${C.gold}15`, border: `1px solid ${isDelivered ? "#16a34a44" : `${C.gold}55`}`, borderRadius: 10, padding: "14px 16px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
             <span style={{ fontSize: 16 }}>{isDelivered ? "✓" : "🎉"}</span>
@@ -123,7 +198,7 @@ function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => v
                   <input
                     type="date"
                     value={selectedDate}
-                    min={new Date(Date.now() + 86400000).toISOString().split("T")[0]}
+                    min={minDeliveryDate}
                     onChange={e => setSelectedDate(e.target.value)}
                     style={{ width: "100%", background: C.card, border: `1px solid ${C.border}`, borderRadius: 6, padding: "7px 10px", color: C.text, fontSize: 12, outline: "none" }}
                   />
@@ -166,8 +241,23 @@ function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => v
               </div>
             </div>
           ) : null}
+          {canCancel && !isScheduling && (
+            <button disabled={cancelling} onClick={handleCancelOrder} style={{ marginTop: 10, background: "none", border: "none", color: "#ef4444", cursor: cancelling ? "wait" : "pointer", ...font(11, 700, 1), textTransform: "uppercase", padding: 0, opacity: cancelling ? 0.6 : 1 }}>
+              {cancelling ? "Cancelling order…" : "Cancel Order"}
+            </button>
+          )}
+          {scheduleMessage && <p role="status" style={{ ...body, color: scheduleMessage.ok ? "#22c55e" : "#ef4444", marginTop: 10 }}>{scheduleMessage.text}</p>}
         </div>
       )}
+
+      {order.status === "cancelled" && (
+        <p style={{ ...body, color: "#ef4444", marginTop: 12 }}>
+          {cancelledByCustomer ? "You cancelled this order." : order.cancellation_reason === "admin_rejected" ? "This pre-order was rejected by the shop." : order.cancellation_reason === "admin_cancelled" ? "This order was cancelled by the shop." : "This order was cancelled before payment was completed."}
+          {" "}Any amount already paid remains recorded; refunds are handled separately.
+        </p>
+      )}
+
+      {scheduleMessage && !(isArrived || isScheduled || isDelivered) && <p role="status" style={{ ...body, color: scheduleMessage.ok ? "#22c55e" : "#ef4444", marginTop: 10 }}>{scheduleMessage.text}</p>}
 
       {preorder && order.fulfillment_status && order.status !== "cancelled" && (
         <>

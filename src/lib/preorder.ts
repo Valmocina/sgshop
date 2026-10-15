@@ -33,6 +33,7 @@ export const FULFILLMENT_STEPS: { key: FulfillmentStatus; customer: string; admi
   { key: "ordered", customer: "Overseas Production", admin: "Ordered from supplier", desc: "Your statue has been ordered with international partners and is in production." },
   { key: "in_transit", customer: "International Transit", admin: "In transit", desc: "Shipped abroad and travelling to the Philippines, undergoing customs clearance." },
   { key: "arrived", customer: "Arrived Locally — Schedule Delivery", admin: "Arrived", desc: "Cleared customs! Please select your White-Glove Supervised Delivery schedule." },
+  { key: "scheduled_delivery", customer: "White-Glove Delivery Scheduled", admin: "Scheduled Delivery", desc: "Your delivery date and time have been confirmed." },
   { key: "delivered", customer: "White-Glove Delivered", admin: "Delivered", desc: "Successfully delivered via specialized transport accompanied by a staff supervisor." },
 ];
 

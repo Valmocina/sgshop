@@ -59,6 +59,8 @@ create table public.orders (
   customer_phone text,
   status text not null default 'pending'
     check (status in ('pending','paid','deposit_paid','failed','cancelled','refunded')),
+  cancellation_reason text
+    check (cancellation_reason in ('customer_cancelled','admin_cancelled','admin_rejected')),
   order_type text not null default 'stock' check (order_type in ('stock','preorder')),
   payment_option text check (payment_option in ('full','deposit')),
   total numeric(10,2) not null,                  -- full order value
@@ -68,7 +70,7 @@ create table public.orders (
   payment_method text,
   -- Pre-order & delivery tracking
   fulfillment_status text
-    check (fulfillment_status in ('awaiting_order','ordered','in_transit','arrived','delivered')),
+    check (fulfillment_status in ('awaiting_order','ordered','in_transit','arrived','scheduled_delivery','delivered')),
   est_arrival text,
   supplier_ref text,
   admin_notes text,
@@ -77,7 +79,7 @@ create table public.orders (
   delivery_time_slot text,
   courier_name text,
   tracking_number text,
-  review_status text default 'accepted' check (review_status in ('pending', 'accepted', 'rejected')),
+  review_status text default 'pending' check (review_status in ('pending', 'accepted', 'rejected')),
   created_at timestamptz not null default now()
 );
 
@@ -101,6 +103,8 @@ alter table public.order_items enable row level security;
 create policy "orders_insert_public" on public.orders for insert to anon, authenticated
   with check (
     status = 'pending' and refunded_amount = 0 and amount_paid = 0
+    and cancellation_reason is null and delivery_date is null and delivery_time_slot is null
+    and review_status = 'pending'
     and (fulfillment_status is null or fulfillment_status = 'awaiting_order')
     and supplier_ref is null and admin_notes is null and ordered_at is null
   );
@@ -116,29 +120,161 @@ create policy "order_items_select" on public.order_items for select to authentic
 
 -- Checkout can move a PENDING order forward; admin can update anything.
 create policy "orders_update" on public.orders for update to anon, authenticated
-  using (status = 'pending' or public.is_admin()) with check (true);
+  using (public.is_admin() or customer_id = auth.uid() or (customer_id is null and status = 'pending'))
+  with check (public.is_admin() or customer_id = auth.uid()
+              or (customer_id is null and status in ('pending','paid','deposit_paid','failed','cancelled')));
 
--- Non-admins may settle their own pending order or schedule delivery once arrived.
+-- Customer delivery/cancellation and admin fulfillment transitions are guarded here.
 create or replace function public.orders_guard() returns trigger
 language plpgsql as $$
 begin
-  if public.is_admin() then return new; end if;
+  if public.is_admin() then
+    if old.status = 'cancelled' and (
+      new.status is distinct from old.status
+      or new.fulfillment_status is distinct from old.fulfillment_status
+      or new.review_status is distinct from old.review_status
+      or new.cancellation_reason is distinct from old.cancellation_reason
+      or new.delivery_date is distinct from old.delivery_date
+      or new.delivery_time_slot is distinct from old.delivery_time_slot
+      or new.amount_paid is distinct from old.amount_paid
+      or new.refunded_amount is distinct from old.refunded_amount
+    ) then
+      raise exception 'Cancelled orders cannot re-enter the fulfillment workflow';
+    end if;
 
-  -- Allow customer to set/update their delivery date and time slot
-  if old.customer_id = auth.uid()
-     and new.total is not distinct from old.total
-     and new.amount_paid is not distinct from old.amount_paid
-     and new.status is not distinct from old.status
-     and new.fulfillment_status is not distinct from old.fulfillment_status
-     and new.amount_due_now is not distinct from old.amount_due_now
-     and new.refunded_amount is not distinct from old.refunded_amount then
+    if new.status = 'cancelled' and old.status is distinct from 'cancelled' then
+      if new.cancellation_reason is null
+         or new.cancellation_reason not in ('admin_cancelled', 'admin_rejected')
+         or new.amount_paid is distinct from old.amount_paid
+         or new.refunded_amount is distinct from old.refunded_amount
+         or new.fulfillment_status is distinct from old.fulfillment_status
+         or new.delivery_date is not null
+         or new.delivery_time_slot is not null then
+        raise exception 'Invalid admin cancellation';
+      end if;
+      if new.cancellation_reason = 'admin_rejected' and new.review_status is distinct from 'rejected' then
+        raise exception 'Rejected pre-orders must have rejected review status';
+      end if;
+    elsif new.cancellation_reason is distinct from old.cancellation_reason then
+      raise exception 'Cancellation reason can only be set when cancelling an order';
+    end if;
+
+    if new.review_status = 'rejected'
+       and (new.status is distinct from 'cancelled' or new.cancellation_reason is distinct from 'admin_rejected') then
+      raise exception 'Rejected pre-orders cannot continue fulfillment';
+    end if;
+
+    if new.review_status is distinct from old.review_status
+       and old.fulfillment_status is distinct from 'awaiting_order' then
+      raise exception 'Pre-order review is closed once supplier ordering begins';
+    end if;
+
+    if new.status is distinct from old.status
+       and new.status is distinct from 'cancelled'
+       and not (old.status = 'deposit_paid' and new.status = 'paid' and new.amount_paid = old.total) then
+      raise exception 'Invalid admin payment status change';
+    end if;
+
+    if new.delivery_date is distinct from old.delivery_date
+       or new.delivery_time_slot is distinct from old.delivery_time_slot then
+      if new.status is distinct from 'cancelled' then
+        raise exception 'Customers must confirm their own delivery schedule';
+      end if;
+    end if;
+
+    if new.fulfillment_status is distinct from old.fulfillment_status then
+      if new.review_status is distinct from 'accepted'
+         or old.status not in ('paid', 'deposit_paid')
+         or old.order_type is distinct from 'preorder' then
+        raise exception 'Pre-order must be paid and accepted before fulfillment';
+      end if;
+      if not (
+        (old.fulfillment_status = 'awaiting_order' and new.fulfillment_status = 'ordered')
+        or (old.fulfillment_status = 'ordered' and new.fulfillment_status = 'in_transit')
+        or (old.fulfillment_status = 'in_transit' and new.fulfillment_status = 'arrived')
+        or (
+          old.fulfillment_status = 'scheduled_delivery'
+          and new.fulfillment_status = 'delivered'
+          and new.delivery_date is not null
+          and new.delivery_time_slot is not null
+        )
+      ) then
+        raise exception 'Fulfillment must follow the required order sequence';
+      end if;
+    end if;
     return new;
   end if;
 
-  -- Otherwise, validate standard customer checkout payment transitions
+  if old.customer_id = auth.uid()
+     and (
+       new.delivery_date is distinct from old.delivery_date
+       or new.delivery_time_slot is distinct from old.delivery_time_slot
+       or (new.status = 'cancelled' and old.order_type = 'preorder'
+           and old.status in ('paid', 'deposit_paid')
+           and old.fulfillment_status in ('arrived', 'scheduled_delivery'))
+       or new.cancellation_reason is distinct from old.cancellation_reason
+       or (old.order_type = 'preorder' and old.status in ('paid', 'deposit_paid')
+           and old.fulfillment_status in ('arrived', 'scheduled_delivery'))
+     ) then
+    if new.total is distinct from old.total
+       or new.amount_paid is distinct from old.amount_paid
+       or new.refunded_amount is distinct from old.refunded_amount
+       or new.customer_id is distinct from old.customer_id
+       or new.customer_name is distinct from old.customer_name
+       or new.customer_email is distinct from old.customer_email
+       or new.customer_phone is distinct from old.customer_phone
+       or new.payment_method is distinct from old.payment_method
+       or new.order_type is distinct from old.order_type
+       or new.payment_option is distinct from old.payment_option
+       or new.amount_due_now is distinct from old.amount_due_now
+       or new.fulfillment_status is distinct from old.fulfillment_status
+       or new.est_arrival is distinct from old.est_arrival
+       or new.supplier_ref is distinct from old.supplier_ref
+       or new.admin_notes is distinct from old.admin_notes
+       or new.courier_name is distinct from old.courier_name
+       or new.tracking_number is distinct from old.tracking_number
+       or new.review_status is distinct from old.review_status
+       or new.ordered_at is distinct from old.ordered_at then
+      raise exception 'Not allowed';
+    end if;
+
+    if new.status = 'cancelled' then
+      if old.status not in ('paid', 'deposit_paid')
+         or old.order_type is distinct from 'preorder'
+         or old.fulfillment_status not in ('arrived', 'scheduled_delivery')
+         or new.cancellation_reason is distinct from 'customer_cancelled'
+         or new.fulfillment_status is distinct from old.fulfillment_status
+         or new.delivery_date is not null
+         or new.delivery_time_slot is not null then
+        raise exception 'This order cannot be cancelled by the customer at this stage';
+      end if;
+      return new;
+    end if;
+
+    if new.status is distinct from old.status
+       or new.cancellation_reason is distinct from old.cancellation_reason
+       or old.status not in ('paid', 'deposit_paid')
+       or old.order_type is distinct from 'preorder'
+       or old.fulfillment_status not in ('arrived', 'scheduled_delivery')
+       or new.fulfillment_status is distinct from old.fulfillment_status
+       or new.delivery_date is null
+       or new.delivery_date <= current_date
+       or new.delivery_time_slot not in ('Morning (9:00 AM - 1:00 PM)', 'Afternoon (1:00 PM - 5:00 PM)', 'Evening (5:00 PM - 8:00 PM)') then
+      raise exception 'Choose a valid future delivery date and time after the order has arrived';
+    end if;
+
+    if old.fulfillment_status = 'arrived' then
+      new.fulfillment_status := 'scheduled_delivery';
+    end if;
+    return new;
+  end if;
+
   if new.total is distinct from old.total
      or new.refunded_amount is distinct from old.refunded_amount
      or new.customer_id is distinct from old.customer_id
+     or new.customer_name is distinct from old.customer_name
+     or new.customer_email is distinct from old.customer_email
+     or new.customer_phone is distinct from old.customer_phone
      or new.payment_method is distinct from old.payment_method
      or new.order_type is distinct from old.order_type
      or new.payment_option is distinct from old.payment_option
@@ -150,11 +286,14 @@ begin
      or new.courier_name is distinct from old.courier_name
      or new.tracking_number is distinct from old.tracking_number
      or new.review_status is distinct from old.review_status
+     or new.cancellation_reason is distinct from old.cancellation_reason
+     or new.delivery_date is distinct from old.delivery_date
+     or new.delivery_time_slot is distinct from old.delivery_time_slot
      or new.ordered_at is distinct from old.ordered_at then
     raise exception 'Not allowed';
   end if;
 
-  if new.status not in ('paid','deposit_paid','failed','cancelled') then
+  if old.status is distinct from 'pending' or new.status not in ('paid', 'deposit_paid', 'failed', 'cancelled') then
     raise exception 'Not allowed';
   end if;
   if new.status = 'deposit_paid' and not (old.order_type = 'preorder' and old.payment_option = 'deposit') then
