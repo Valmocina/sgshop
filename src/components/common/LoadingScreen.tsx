@@ -1,4 +1,3 @@
-import { C } from "@/lib/theme";
 import logoSrc from "@/imports/SITHGUY HOBBYSHOP.png";
 
 export function LoadingScreen() {
@@ -15,32 +14,46 @@ export function LoadingScreen() {
           width: "min(420px, 80vw)",
           height: "auto",
           objectFit: "contain",
-          animation: "logo-pulse 1.4s ease-in-out infinite",
           filter: "drop-shadow(0 0 32px rgba(245,166,35,0.6))",
           marginBottom: 40,
         }}
       />
-      {/* Lightsaber progress bar */}
-      <div style={{ width: "min(300px, 70vw)", height: 4, background: "#1a1a1a", borderRadius: 4, overflow: "hidden" }}>
-        <div style={{
-          height: "100%", borderRadius: 4,
-          background: `linear-gradient(90deg, ${C.goldDark}, ${C.gold}, #fff8, ${C.gold})`,
-          backgroundSize: "200% 100%",
-          animation: "saber-sweep 1.2s linear infinite",
-        }} />
+      <div className="loading-saber" aria-hidden="true">
+        <div className="loading-saber-hilt" />
+        <div className="loading-saber-blade" />
       </div>
       <p style={{ marginTop: 16, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 4, color: "rgba(245,166,35,0.7)", textTransform: "uppercase" }}>
         Loading…
       </p>
       <style>{`
-        @keyframes logo-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.85; transform: scale(0.97); }
+        .loading-saber {
+          position: relative;
+          width: min(300px, 70vw);
+          height: 12px;
         }
-        @keyframes saber-sweep {
-          0% { background-position: 200% 0; width: 30%; }
-          50% { width: 80%; }
-          100% { background-position: -200% 0; width: 30%; }
+        .loading-saber-hilt {
+          position: absolute;
+          left: 0;
+          top: 2px;
+          width: 22px;
+          height: 8px;
+          border-radius: 3px;
+          background: linear-gradient(#ddd, #777 45%, #bbb 55%, #555);
+          box-shadow: 0 0 5px #aaa8;
+        }
+        .loading-saber-blade {
+          position: absolute;
+          left: 19px;
+          top: 4px;
+          width: 0;
+          height: 4px;
+          border-radius: 4px;
+          background: #e9fbff;
+          box-shadow: 0 0 5px 2px #36bfff, 0 0 14px 5px #168dff99;
+          animation: saber-extend 1.2s ease-out forwards;
+        }
+        @keyframes saber-extend {
+          to { width: calc(100% - 19px); }
         }
       `}</style>
     </div>
