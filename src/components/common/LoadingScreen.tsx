@@ -19,18 +19,28 @@ export function LoadingScreen() {
           marginBottom: 40,
         }}
       />
-      <div className="loading-saber" aria-hidden="true">
-        <img className="loading-saber-hilt" src={hiltSrc} alt="" />
-        <div className="loading-saber-blade" />
+      <div className="loading-saber-frame" aria-hidden="true">
+        <div className="loading-saber">
+          <img className="loading-saber-hilt" src={hiltSrc} alt="" />
+          <div className="loading-saber-blade" />
+        </div>
       </div>
       <p style={{ marginTop: 16, fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13, fontWeight: 700, letterSpacing: 4, color: "rgba(245,166,35,0.7)", textTransform: "uppercase" }}>
         Loading…
       </p>
       <style>{`
-        .loading-saber {
+        .loading-saber-frame {
           position: relative;
+          width: min(380px, 70vw, 45vh);
+          height: 64px;
+        }
+        .loading-saber {
+          position: absolute;
+          left: 50%;
+          top: 50%;
           width: 64px;
-          height: min(380px, 45vh);
+          height: min(380px, 70vw, 45vh);
+          transform: translate(-50%, -50%) rotate(90deg);
         }
         .loading-saber-hilt {
           position: absolute;
