@@ -7,104 +7,41 @@ import logoSrc from "@/imports/SITHGUY HOBBYSHOP.png";
 export function HomeLanding({ onShopNow }: { onShopNow: () => void }) {
   const w = useWindowWidth();
   const isMobile = w < 640;
-
-  // Generate deterministic star positions
   const stars = Array.from({ length: 160 }, (_, i) => {
     const seed = (i * 7919 + 13) % 1000;
     const seed2 = (i * 6271 + 37) % 1000;
     const seed3 = (i * 4567 + 91) % 1000;
     const angle = (seed / 1000) * 360;
     const dist = 5 + (seed2 / 1000) * 45;
-    const size = 0.5 + (seed3 / 1000) * 2.5;
-    const duration = 1.5 + (seed2 / 1000) * 3;
-    const delay = -(seed / 1000) * 4;
-    const x = 50 + dist * Math.cos((angle * Math.PI) / 180);
-    const y = 50 + dist * Math.sin((angle * Math.PI) / 180);
-    return { x, y, size, duration, delay, angle };
+    return {
+      x: 50 + dist * Math.cos((angle * Math.PI) / 180),
+      y: 50 + dist * Math.sin((angle * Math.PI) / 180),
+      size: 0.5 + (seed3 / 1000) * 2.5,
+      duration: 1.5 + (seed2 / 1000) * 3,
+      delay: -(seed / 1000) * 4,
+    };
   });
 
   return (
-    <div style={{ position: "relative", width: "100%", flex: 1, background: "#000", overflow: "hidden", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "calc(100vh - 110px)" }}>
-      {/* Starfield layer */}
+    <div style={{ position: "relative", width: "100%", flex: 1, minHeight: 0, background: "#000", overflow: "hidden", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
       <div style={{ position: "absolute", inset: 0 }}>
-        {stars.map((s, i) => (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              left: `${s.x}%`,
-              top: `${s.y}%`,
-              width: s.size,
-              height: s.size,
-              borderRadius: "50%",
-              background: "#fff",
-              opacity: 0,
-              transform: "translate(-50%, -50%)",
-              animation: `warp-star ${s.duration}s ${s.delay}s linear infinite`,
-            }}
-          />
+        {stars.map((star, i) => (
+          <div key={i} style={{ position: "absolute", left: `${star.x}%`, top: `${star.y}%`, width: star.size, height: star.size, borderRadius: "50%", background: "#fff", opacity: 0, transform: "translate(-50%, -50%)", animation: `warp-star ${star.duration}s ${star.delay}s linear infinite` }} />
         ))}
       </div>
 
-      {/* Streak rays from center */}
       {Array.from({ length: 24 }, (_, i) => {
         const angle = (i / 24) * 360;
-        return (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              left: "50%",
-              top: "50%",
-              width: "2px",
-              height: "0%",
-              background: `linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0.25), rgba(255,255,255,0))`,
-              transformOrigin: "50% 0",
-              transform: `rotate(${angle}deg)`,
-              animation: `ray-pulse ${2.4 + (i % 5) * 0.4}s ${-(i * 0.1)}s ease-in-out infinite`,
-              borderRadius: 2,
-            }}
-          />
-        );
+        return <div key={i} style={{ position: "absolute", left: "50%", top: "50%", width: 2, height: 0, background: "linear-gradient(to bottom, transparent, rgba(255,255,255,0.25), transparent)", transformOrigin: "50% 0", transform: `rotate(${angle}deg)`, animation: `ray-pulse ${2.4 + (i % 5) * 0.4}s ${-(i * 0.1)}s ease-in-out infinite`, borderRadius: 2 }} />;
       })}
-
-      {/* Radial glow from center */}
       <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse 55% 45% at 50% 50%, rgba(245,166,35,0.08) 0%, rgba(245,166,35,0.03) 40%, transparent 70%)", pointerEvents: "none" }} />
-
-      {/* HOME label */}
       <div style={{ position: "absolute", top: 24, left: "50%", transform: "translateX(-50%)" }}>
         <span style={{ ...font(15, 700, 3), color: "rgba(255,255,255,0.85)", textTransform: "uppercase", letterSpacing: 6 }}>HOME</span>
       </div>
 
-      {/* Center content */}
-      <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-        {/* Hero logo */}
-        <img
-          src={logoSrc}
-          alt="Sithguy Hobbyshop"
-          style={{
-            width: isMobile ? "80vw" : 520,
-            maxWidth: "90vw",
-            height: "auto",
-            objectFit: "contain",
-            marginBottom: 28,
-            filter: "drop-shadow(0 0 40px rgba(245,166,35,0.5))",
-          }}
-        />
-
-        <p style={{
-          fontFamily: "'Barlow', sans-serif",
-          fontSize: isMobile ? 14 : 17,
-          fontWeight: 700,
-          fontStyle: "italic",
-          color: "rgba(255,255,255,0.9)",
-          textAlign: "center",
-          maxWidth: isMobile ? "90vw" : 540,
-          lineHeight: 1.7,
-          marginBottom: 28,
-          textShadow: "0 2px 12px rgba(0,0,0,0.8)",
-          padding: isMobile ? "0 12px" : 0,
-        }}>
+      <div style={{ position: "relative", zIndex: 2, display: "flex", flexDirection: "column", alignItems: "center" }}>
+        <img src={logoSrc} alt="Sithguy Hobbyshop" style={{ width: isMobile ? "80vw" : 520, maxWidth: "90vw", height: "auto", objectFit: "contain", marginBottom: 28, filter: "drop-shadow(0 0 40px rgba(245,166,35,0.5))" }} />
+        <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: isMobile ? 14 : 17, fontWeight: 700, fontStyle: "italic", color: "rgba(255,255,255,0.9)", textAlign: "center", maxWidth: isMobile ? "90vw" : 540, lineHeight: 1.7, marginBottom: 28, textShadow: "0 2px 12px rgba(0,0,0,0.8)", padding: isMobile ? "0 12px" : 0 }}>
           Welcome to Sithguy Hobbyshop, your premier destination for<br />
           all things Star Wars, Marvel, DC, and other collectibles.<br />
           <span style={{ textDecoration: "underline" }}>Located in Mandaluyong City, Philippines</span>
@@ -167,9 +104,9 @@ export function HomeLanding({ onShopNow }: { onShopNow: () => void }) {
 
       <style>{`
         @keyframes warp-star {
-          0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
-          10%  { opacity: 0.9; }
-          85%  { opacity: 0.5; }
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+          10% { opacity: 0.9; }
+          85% { opacity: 0.5; }
           100% { opacity: 0; transform: translate(-50%, -50%) scale(1) translate(var(--dx, 40px), var(--dy, 40px)); }
         }
         @keyframes ray-pulse {

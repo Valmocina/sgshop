@@ -8,14 +8,24 @@ import { ProductCard } from "@/components/shop/ProductCard";
 import { HomeLanding } from "@/components/shop/HomeLanding";
 import { useWindowWidth } from "@/hooks/useWindowWidth";
 
-export function ShopPage({ cartCount, onProductClick, onCartClick, onAccountClick, products, activeCategory, onCategoryChange }: {
+const visitedCategories = new Set<Category>(["HOME"]);
+
+export function ShopPage({ cartCount, onProductClick, onCartClick, onAccountClick, onLogout, customerLoggedIn, products, activeCategory, onCategoryChange }: {
   cartCount: number; onProductClick: (p: Product) => void; onCartClick: () => void; onAccountClick: () => void;
+  onLogout: () => void; customerLoggedIn: boolean;
   products: Product[]; activeCategory: Category; onCategoryChange: (c: Category) => void;
 }) {
-  const setActiveCategory = onCategoryChange;
   const [showFilters, setShowFilters] = useState(false);
+  const [animateCategory, setAnimateCategory] = useState(false);
+  const [headerPop, setHeaderPop] = useState(false);
   const w = useWindowWidth();
   const isMobile = w < 768;
+  const setActiveCategory = (category: Category) => {
+    setAnimateCategory(!visitedCategories.has(category));
+    visitedCategories.add(category);
+    setHeaderPop(activeCategory === "HOME" && category !== "HOME");
+    onCategoryChange(category);
+  };
 
   const [searchQuery, setSearchQuery] = useState("");
   const [filterSearch, setFilterSearch] = useState("");
@@ -54,13 +64,16 @@ export function ShopPage({ cartCount, onProductClick, onCartClick, onAccountClic
   });
 
   return (
-    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
-      <ShopHeader cartCount={cartCount} onCartClick={onCartClick} onAccountClick={onAccountClick} searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+    <div style={{ height: activeCategory === "HOME" ? "100vh" : "auto", minHeight: "100vh", overflow: activeCategory === "HOME" ? "hidden" : undefined, background: C.bg, display: "flex", flexDirection: "column" }}>
+      {activeCategory !== "HOME" && (
+        <ShopHeader cartCount={cartCount} onCartClick={onCartClick} onAccountClick={onAccountClick} onLogout={onLogout} customerLoggedIn={customerLoggedIn} searchQuery={searchQuery} onSearchChange={setSearchQuery} popIn={headerPop} onPopInEnd={() => setHeaderPop(false)} />
+      )}
       <NavBar active={activeCategory} onChange={setActiveCategory} />
 
-      {activeCategory === "HOME" ? (
-        <HomeLanding onShopNow={() => setActiveCategory("ALL")} />
-      ) : (
+      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        {activeCategory === "HOME" ? (
+          <HomeLanding onShopNow={() => setActiveCategory("ALL")} />
+        ) : (
       <div style={{ flex: 1, display: "flex", gap: 16, padding: isMobile ? 10 : 16, alignItems: "flex-start", position: "relative" }}>
         {/* Mobile filter drawer overlay */}
         {isMobile && showFilters && (
@@ -99,7 +112,11 @@ export function ShopPage({ cartCount, onProductClick, onCartClick, onAccountClic
             )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(auto-fill, minmax(180px, 1fr))" : "repeat(auto-fill, minmax(340px, 1fr))", gap: isMobile ? 14 : 24 }}>
-            {filtered.map((p) => <ProductCard key={p.id} product={p} onClick={() => onProductClick(p)} />)}
+            {filtered.map((p) => (
+              <div key={p.id} className={animateCategory ? "shop-tab-enter" : undefined}>
+                <ProductCard product={p} onClick={() => onProductClick(p)} />
+              </div>
+            ))}
             {filtered.length === 0 && (
               <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "80px 0" }}>
                 <p style={{ ...font(22, 700, 3), color: C.textDim }}>NO ITEMS FOUND</p>
@@ -109,7 +126,8 @@ export function ShopPage({ cartCount, onProductClick, onCartClick, onAccountClic
           </div>
         </div>
       </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/Input";
 export function NavBar({ active, onChange }: { active: Category; onChange: (c: Category) => void }) {
   const cats: Category[] = ["HOME", "ALL", "POPULAR", "STARWARS", "MARVEL", "DC", "OTHERS"];
   return (
-    <div style={{ background: C.surface, borderBottom: `2px solid ${C.border}`, display: "flex", paddingLeft: 8, overflow: "auto" }}>
+    <div className="shop-nav-scroll" style={{ background: C.surface, borderBottom: `2px solid ${C.border}`, display: "flex", paddingLeft: 8, overflow: "auto" }}>
       {cats.map((cat) => {
         const isActive = active === cat;
         return (

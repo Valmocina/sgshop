@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/Input";
 import { ShopHeader } from "@/components/shop/ShopHeader";
 import { useWindowWidth } from "@/hooks/useWindowWidth";
 
-export function ProductDetailPage({ product, cartCount, onBack, onAddToCart, onCartClick, onAccountClick }: {
+export function ProductDetailPage({ product, cartCount, onBack, onAddToCart, onCartClick, onAccountClick, onLogout, customerLoggedIn }: {
   product: Product; cartCount: number; onBack: () => void;
   onAddToCart: (p: Product, qty: number) => void; onCartClick: () => void; onAccountClick: () => void;
+  onLogout: () => void; customerLoggedIn: boolean;
 }) {
   const [qty, setQty] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
@@ -26,7 +27,7 @@ export function ProductDetailPage({ product, cartCount, onBack, onAddToCart, onC
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column" }}>
-      <ShopHeader cartCount={cartCount} onCartClick={onCartClick} onAccountClick={onAccountClick} searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+      <ShopHeader cartCount={cartCount} onCartClick={onCartClick} onAccountClick={onAccountClick} onLogout={onLogout} customerLoggedIn={customerLoggedIn} searchQuery={searchQuery} onSearchChange={setSearchQuery} />
 
       <div style={{ padding: isMobile ? "10px" : "16px" }}>
         {/* Back bar */}

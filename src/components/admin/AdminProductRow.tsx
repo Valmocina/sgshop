@@ -41,7 +41,7 @@ export function AdminProductRow({ product: p, isLast, onEdit, onDelete, onToggle
         </div>
       </td>
       <td style={{ ...tdStyle, textAlign: "center" }}>
-        <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+        <div className="admin-product-actions" style={{ display: "flex", gap: 4, justifyContent: "center" }}>
           <ActionBtn title={p.is_hidden ? "Show" : "Hide"} color={p.is_hidden ? A.green : A.textMuted} onClick={onToggleHide}>
             {p.is_hidden
               ? <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx={12} cy={12} r={3}/></svg>
@@ -62,4 +62,3 @@ export function AdminProductRow({ product: p, isLast, onEdit, onDelete, onToggle
     </tr>
   );
 }
-

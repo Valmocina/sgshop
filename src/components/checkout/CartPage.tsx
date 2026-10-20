@@ -17,6 +17,8 @@ export function CartPage({
   cartCount,
   onCartClick,
   onAccountClick,
+  onLogout,
+  customerLoggedIn,
 }: {
   cartItems: { product: Product; qty: number }[];
   onBack: () => void;
@@ -26,6 +28,8 @@ export function CartPage({
   cartCount: number;
   onCartClick: () => void;
   onAccountClick: () => void;
+  onLogout: () => void;
+  customerLoggedIn: boolean;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const total = cartItems.reduce((s, i) => s + i.product.price * i.qty, 0);
@@ -37,6 +41,8 @@ export function CartPage({
         cartCount={cartCount}
         onCartClick={onCartClick}
         onAccountClick={onAccountClick}
+        onLogout={onLogout}
+        customerLoggedIn={customerLoggedIn}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
       />
@@ -137,4 +143,3 @@ export function CartPage({
     </div>
   );
 }
-

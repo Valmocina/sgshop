@@ -265,7 +265,7 @@ export default function RevenueOverview() {
                 <RevenueChart buckets={chartBuckets} />
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 0 }}>
+              <div className="admin-revenue-charts" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20, marginBottom: 0 }}>
                 <div style={sectionStyle}>
                   <p style={{ ...af(15, 700), color: TEXT, marginBottom: 16 }}>Revenue by Category</p>
                   <RevenueByCategory data={categoryRevenue} />

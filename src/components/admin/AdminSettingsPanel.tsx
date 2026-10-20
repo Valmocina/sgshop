@@ -31,7 +31,7 @@ export function AdminSettingsPanel({ adminEmail, onChangeAdminPassword, paymongo
   };
 
   return (
-    <div style={{ padding: "28px 28px", maxWidth: 700 }}>
+    <div className="admin-settings-panel" style={{ padding: "28px 28px", maxWidth: 700 }}>
       <h1 style={{ ...af(22, 700), color: A.text, marginBottom: 28 }}>Settings</h1>
 
       {/* Admin credentials */}

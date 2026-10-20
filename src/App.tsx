@@ -465,6 +465,14 @@ export default function App() {
     setPage("shop");
     setActiveCategory("ALL");
   };
+  const customerLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Failed to sign out customer:", error);
+      return;
+    }
+    goToStore();
+  };
   const returnFromAuth = () => {
     if (authForCheckout) {
       sessionStorage.removeItem("pendingCheckout");
@@ -563,6 +571,8 @@ if (page === "shop")
         onAccountClick={() =>
           loggedInCustomer ? setPage("account") : setPage("auth")
         }
+        onLogout={customerLogout}
+        customerLoggedIn={Boolean(loggedInCustomer)}
         activeCategory={activeCategory}
         onCategoryChange={setActiveCategory}
       />
@@ -575,6 +585,8 @@ if (page === "shop")
           cartCount={cartCount}
           onCartClick={goToCart}
           onAccountClick={() => (loggedInCustomer ? setPage("account") : setPage("auth"))}
+          onLogout={customerLogout}
+          customerLoggedIn={Boolean(loggedInCustomer)}
           searchQuery=""
           onSearchChange={() => {}}
         />
@@ -628,6 +640,8 @@ if (page === "shop")
         onAccountClick={() =>
           loggedInCustomer ? setPage("account") : setPage("auth")
         }
+        onLogout={customerLogout}
+        customerLoggedIn={Boolean(loggedInCustomer)}
       />
     );
 
@@ -642,6 +656,8 @@ if (page === "shop")
         onAccountClick={() =>
           loggedInCustomer ? setPage("account") : setPage("auth")
         }
+        onLogout={customerLogout}
+        customerLoggedIn={Boolean(loggedInCustomer)}
       />
     );
 
