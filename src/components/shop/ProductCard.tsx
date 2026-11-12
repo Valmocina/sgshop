@@ -7,12 +7,15 @@ import { Btn } from "@/components/ui/Btn";
 import { Input } from "@/components/ui/Input";
 import { isPreOrder } from "@/lib/preorder";
 
-export function ProductCard({ product, onClick }: { product: Product; onClick: () => void }) {
+export function ProductCard({ product, onClick, onAddToCart }: { product: Product; onClick: () => void; onAddToCart: (product: Product) => void }) {
   const [hov, setHov] = useState(false);
+  const [added, setAdded] = useState(false);
   return (
-    <button onClick={onClick} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
-      style={{ background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
-      <div style={{ background: C.card, borderRadius: 12, overflow: "hidden", border: `1px solid ${hov ? C.borderLight : C.border}`, transform: hov ? "translateY(-3px)" : "none", boxShadow: hov ? `0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px ${C.gold}33` : "0 2px 8px rgba(0,0,0,0.3)", transition: "all 0.22s" }}>
+    <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ background: C.card, borderRadius: 12, overflow: "hidden", border: `1px solid ${hov ? C.borderLight : C.border}`, transform: hov ? "translateY(-3px)" : "none", boxShadow: hov ? `0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px ${C.gold}33` : "0 2px 8px rgba(0,0,0,0.3)", transition: "all 0.22s" }}>
+      <button type="button" onClick={onClick}
+        aria-label={`View ${product.name} details`}
+        style={{ display: "block", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
         <div style={{ position: "relative", aspectRatio: "1", overflow: "hidden" }}>
           <img src={product.image} alt={product.name} style={{ width: "100%", height: "100%", objectFit: "cover", transform: hov ? "scale(1.06)" : "scale(1)", transition: "transform 0.3s" }} />
           <div style={{ position: "absolute", inset: 0, background: hov ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0)", transition: "all 0.22s", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -30,8 +33,17 @@ export function ProductCard({ product, onClick }: { product: Product; onClick: (
             <span style={{ ...font(11, 700, 0.5), color: C.gold, background: `${C.gold}15`, borderRadius: 4, padding: "3px 10px", border: `1px solid ${C.gold}44` }}>MADE TO ORDER</span>
           </div>
         </div>
+      </button>
+      <div style={{ padding: "0 16px 16px" }}>
+        <button type="button" onClick={() => {
+          onAddToCart(product);
+          setAdded(true);
+          setTimeout(() => setAdded(false), 1500);
+        }} style={{ width: "100%", background: added ? `${C.gold}22` : C.gold, border: `1px solid ${C.gold}`, borderRadius: 6, padding: "10px 12px", cursor: "pointer", ...font(12, 800, 1.2), color: added ? C.gold : "#111", transition: "all 0.15s" }}>
+          {added ? "ADDED TO CART" : "ADD TO CART"}
+        </button>
       </div>
-    </button>
+    </div>
   );
 }
 
