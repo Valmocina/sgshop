@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import type { Page, Category, Product, PaymentOption, ContactInfo, PayMethod } from "@/types/store";
 import { C, font } from "@/lib/theme";
@@ -198,6 +198,91 @@ export default function App() {
   const [cartItems, setCartItems] = useState<{ product: Product; qty: number }[]>(
     []
   );
+  const cartItemsRef = useRef(cartItems);
+  const cartOwnerIdRef = useRef<string | null>(null);
+  const updateCartItems = (
+    update: (items: typeof cartItems) => typeof cartItems,
+  ) => {
+    const next = update(cartItemsRef.current);
+    cartItemsRef.current = next;
+    setCartItems(next);
+  };
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!loggedInCustomer) {
+      cartOwnerIdRef.current = null;
+      updateCartItems(() => []);
+      return;
+    }
+    if (products.length === 0) return;
+    if (cartOwnerIdRef.current && cartOwnerIdRef.current !== loggedInCustomer.id) {
+      updateCartItems(() => []);
+    }
+
+    let active = true;
+    const loadCart = async () => {
+      const { data, error } = await supabase
+        .from("cart_items")
+        .select("product_id, quantity")
+        .eq("user_id", loggedInCustomer.id);
+
+      if (!active) return;
+      if (error) {
+        console.error("Failed to load customer cart:", error);
+        cartOwnerIdRef.current = loggedInCustomer.id;
+        updateCartItems(() => []);
+        return;
+      }
+
+      const productsById = new Map(
+        products.map((product) => [product.id, product]),
+      );
+      const accountItems = (data ?? []).flatMap((item) => {
+        const product = productsById.get(Number(item.product_id));
+        return product ? [{ product, qty: item.quantity }] : [];
+      });
+      const guestItems =
+        cartOwnerIdRef.current === null ? cartItemsRef.current : [];
+      const mergedItems = [...accountItems];
+      for (const guestItem of guestItems) {
+        const existing = mergedItems.find(
+          (item) => item.product.id === guestItem.product.id,
+        );
+        if (existing) existing.qty += guestItem.qty;
+        else mergedItems.push(guestItem);
+      }
+
+      cartOwnerIdRef.current = loggedInCustomer.id;
+      updateCartItems(() => mergedItems);
+      const guestWrites = await Promise.all(
+        guestItems.map((item) => {
+          const merged = mergedItems.find(
+            (entry) => entry.product.id === item.product.id,
+          );
+          return supabase.from("cart_items").upsert(
+            {
+              user_id: loggedInCustomer.id,
+              product_id: item.product.id,
+              quantity: merged?.qty ?? item.qty,
+            },
+            { onConflict: "user_id,product_id" },
+          );
+        }),
+      );
+      for (const result of guestWrites) {
+        if (result.error) {
+          console.error("Failed to merge guest cart into customer cart:", result.error);
+        }
+      }
+    };
+
+    void loadCart();
+    return () => {
+      active = false;
+    };
+  }, [authLoading, loggedInCustomer?.id, products]);
+
   const [confirmedOrder, setConfirmedOrder] = useState<PendingOrder | null>(null);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
   const [contact, setContact] = useState<ContactInfo>({ name: "", email: "", phone: "" });
@@ -363,7 +448,9 @@ export default function App() {
   };
 
   const addToCart = (product: Product, qty: number) => {
-    setCartItems((prev) => {
+    const currentItems = cartItemsRef.current;
+    const existing = currentItems.find((item) => item.product.id === product.id);
+    updateCartItems((prev) => {
       const ex = prev.find((i) => i.product.id === product.id);
       return ex
         ? prev.map((i) =>
@@ -371,6 +458,28 @@ export default function App() {
           )
         : [...prev, { product, qty }];
     });
+    if (loggedInCustomer) {
+      void saveCartItem(product.id, (existing?.qty ?? 0) + qty);
+    }
+  };
+
+  const saveCartItem = async (productId: number, qty: number) => {
+    if (!loggedInCustomer) return;
+    const { error } = await supabase.from("cart_items").upsert(
+      { user_id: loggedInCustomer.id, product_id: productId, quantity: qty },
+      { onConflict: "user_id,product_id" },
+    );
+    if (error) console.error("Failed to save customer cart item:", error);
+  };
+
+  const removeCartItem = async (productId: number) => {
+    if (!loggedInCustomer) return;
+    const { error } = await supabase
+      .from("cart_items")
+      .delete()
+      .eq("user_id", loggedInCustomer.id)
+      .eq("product_id", productId);
+    if (error) console.error("Failed to remove customer cart item:", error);
   };
 
   const handleAddToCart = (product: Product, qty: number) => {
@@ -630,14 +739,16 @@ if (page === "shop")
         cartItems={cartItems}
         cartCount={cartCount}
         onBack={goToStore}
-        onRemove={(id) =>
-          setCartItems((prev) => prev.filter((i) => i.product.id !== id))
-        }
-        onUpdateQty={(id, qty) =>
-          setCartItems((prev) =>
-            prev.map((i) => (i.product.id === id ? { ...i, qty } : i))
-          )
-        }
+        onRemove={(id) => {
+          updateCartItems((prev) => prev.filter((i) => i.product.id !== id));
+          void removeCartItem(id);
+        }}
+        onUpdateQty={(id, qty) => {
+          updateCartItems((prev) =>
+            prev.map((i) => (i.product.id === id ? { ...i, qty } : i)),
+          );
+          void saveCartItem(id, qty);
+        }}
         onCheckout={(product, qty) => {
           continueToCheckout(product, qty, "full");
         }}

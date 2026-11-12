@@ -40,7 +40,7 @@ export function CartRow({ product, qty, onRemove, onQtyChange }: {
             <button onClick={() => onQtyChange(Math.max(1, qty - 1))} style={{ width: 28, height: 28, borderRadius: "50%", border: `1.5px solid ${C.border}`, background: "transparent", ...font(18, 700, 0), color: C.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
               onMouseEnter={e => e.currentTarget.style.borderColor = C.gold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>−</button>
             <span style={{ ...font(15, 700, 0), color: C.text, minWidth: 22, textAlign: "center" }}>{qty}</span>
-            <button onClick={() => onQtyChange(Math.min(product.stock, qty + 1))} style={{ width: 28, height: 28, borderRadius: "50%", border: `1.5px solid ${C.border}`, background: "transparent", ...font(18, 700, 0), color: C.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
+            <button onClick={() => onQtyChange(product.stock <= 0 || product.scale === "Lifesize" ? qty + 1 : Math.max(qty, Math.min(product.stock, qty + 1)))} style={{ width: 28, height: 28, borderRadius: "50%", border: `1.5px solid ${C.border}`, background: "transparent", ...font(18, 700, 0), color: C.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}
               onMouseEnter={e => e.currentTarget.style.borderColor = C.gold} onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>+</button>
           </div>
         </div>
