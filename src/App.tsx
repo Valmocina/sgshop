@@ -362,9 +362,7 @@ export default function App() {
     if (error) console.error(`Failed to mark order ${status}:`, error);
   };
 
-  const handleAddToCart = (product: Product, qty: number) => {
-    setOrderQty(qty);
-    setSelectedProduct(product);
+  const addToCart = (product: Product, qty: number) => {
     setCartItems((prev) => {
       const ex = prev.find((i) => i.product.id === product.id);
       return ex
@@ -373,6 +371,12 @@ export default function App() {
           )
         : [...prev, { product, qty }];
     });
+  };
+
+  const handleAddToCart = (product: Product, qty: number) => {
+    setOrderQty(qty);
+    setSelectedProduct(product);
+    addToCart(product, qty);
     setPage("cart");
   };
 
@@ -563,6 +567,7 @@ if (page === "shop")
       <ShopPage
         products={products}
         cartCount={cartCount}
+        onAddToCart={(product) => addToCart(product, 1)}
         onProductClick={(p) => {
           setSelectedProduct(p);
           setPage("lifesize");
