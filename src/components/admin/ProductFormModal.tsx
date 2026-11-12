@@ -7,6 +7,7 @@ import { AField } from "@/components/admin/AField";
 import { AInput } from "@/components/admin/AInput";
 import { ASelect } from "@/components/admin/ASelect";
 import { AToggle } from "@/components/admin/AToggle";
+import { LIFESIZE_NET_MARGIN, MAX_LIFESIZE_UNIT_COST, priceForLifesizeMargin } from "@/lib/lifesizeProfit";
 
 // Fixes: Cannot find name 'BLANK_FORM'
 const BLANK_FORM = {
@@ -18,6 +19,7 @@ const BLANK_FORM = {
   scale: "1:6" as const,
   condition: "Brand New" as const,
   price: "",
+  unit_cost: "",
   stock: "",
   image: "",
   is_available: true,
@@ -41,6 +43,7 @@ export function ProductFormModal({ product, onSave, onSaveAndAddAnother, onCance
     category: product.category, franchise: product.franchise,
     brand: product.brand, scale: product.scale, condition: product.condition,
     price: String(product.price), stock: String(product.stock), image: product.image,
+    unit_cost: product.unit_cost != null ? String(product.unit_cost) : "",
     is_available: product.is_available !== false,
     is_featured: product.is_featured || false,
     new: product.new,
@@ -52,6 +55,12 @@ export function ProductFormModal({ product, onSave, onSaveAndAddAnother, onCance
 
   // Lifesize figures are never stocked: the customer orders first, then the admin orders from the supplier.
   const preorder = isPreOrder({ scale: form.scale as Product["scale"] });
+  const lifesize = form.scale === "Lifesize";
+  const numericUnitCost = Number(form.unit_cost);
+  const calculatedPrice = lifesize && Number.isFinite(numericUnitCost) && numericUnitCost > 0 && numericUnitCost <= MAX_LIFESIZE_UNIT_COST
+    ? priceForLifesizeMargin(numericUnitCost)
+    : null;
+  const effectivePrice = calculatedPrice ?? Number(form.price);
 
   const [imgPreview, setImgPreview] = useState(product?.image || "");
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -92,12 +101,17 @@ export function ProductFormModal({ product, onSave, onSaveAndAddAnother, onCance
   const validate = () => {
     const e: Record<string, string> = {};
     if (!form.name.trim()) e.name = "Name is required";
-    if (!form.price || isNaN(Number(form.price)) || Number(form.price) <= 0) e.price = "Valid price required";
+    if (lifesize && (form.unit_cost === "" || !Number.isFinite(numericUnitCost) || numericUnitCost <= 0)) {
+      e.unit_cost = "Enter the total cost per statue to calculate its selling price";
+    } else if (lifesize && numericUnitCost > MAX_LIFESIZE_UNIT_COST) {
+      e.unit_cost = "Total cost is too high for the product price limit";
+    }
+    if (!lifesize && (!form.price || isNaN(Number(form.price)) || Number(form.price) <= 0)) e.price = "Valid price required";
     if (!preorder && (!form.stock || isNaN(Number(form.stock)) || Number(form.stock) < 0)) e.stock = "Valid stock required";
     if (preorder && form.deposit_amount !== "") {
       const dep = Number(form.deposit_amount);
       if (isNaN(dep) || dep <= 0) e.deposit_amount = "Enter a valid deposit, or leave blank for the 30% default";
-      else if (dep > Number(form.price)) e.deposit_amount = "Deposit can't be more than the price";
+      else if (dep > effectivePrice) e.deposit_amount = "Deposit can't be more than the price";
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -111,7 +125,8 @@ export function ProductFormModal({ product, onSave, onSaveAndAddAnother, onCance
     brand: form.brand as any,
     scale: form.scale as any,
     condition: form.condition as any,
-    price: Number(form.price),
+    price: lifesize ? priceForLifesizeMargin(numericUnitCost) : Number(form.price),
+    unit_cost: lifesize ? numericUnitCost : null,
     stock: preorder ? 0 : Number(form.stock),
     image: form.image || "https://images.unsplash.com/photo-1587502536263-aa47cd87e898?w=500&h=500&fit=crop&auto=format",
     is_available: form.is_available,
@@ -166,8 +181,14 @@ export function ProductFormModal({ product, onSave, onSaveAndAddAnother, onCance
                   style={{ width: "100%", background: A.card, border: `1.5px solid ${A.border}`, borderRadius: 8, padding: "10px 12px", ...af(14, 400), color: A.text, outline: "none", resize: "vertical", minHeight: 80 }} />
               </AField>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
-                <AField label="Price (₱)">
-                  <AInput value={form.price} onChange={v => set("price", v)} placeholder="25000" type="number" />
+                <AField label={lifesize ? "Selling Price (₱) — 60% Net Margin" : "Price (₱)"}>
+                  {lifesize ? (
+                    <div style={{ background: A.card, border: `1.5px solid ${A.border}`, borderRadius: 8, padding: "10px 12px", ...af(14, 600), color: A.text }}>
+                      {calculatedPrice == null ? "Enter total cost below" : `₱${calculatedPrice.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                    </div>
+                  ) : (
+                    <AInput value={form.price} onChange={v => set("price", v)} placeholder="25000" type="number" />
+                  )}
                   {errors.price && <p style={{ ...af(11, 500), color: A.red, marginTop: 4 }}>{errors.price}</p>}
                 </AField>
                 <AField label="Stock Qty">
@@ -183,6 +204,15 @@ export function ProductFormModal({ product, onSave, onSaveAndAddAnother, onCance
                   )}
                 </AField>
               </div>
+              {lifesize && (
+                <AField label="Total Cost per Statue (₱)">
+                  <AInput value={form.unit_cost} onChange={v => set("unit_cost", v)} placeholder="Supplier + shipping + customs + fees" type="number" />
+                  {errors.unit_cost && <p style={{ ...af(11, 500), color: A.red, marginTop: 4 }}>{errors.unit_cost}</p>}
+                  <p style={{ ...af(11, 400), color: A.textMuted, marginTop: 4 }}>
+                    Include all per-statue costs. The selling price is calculated to target {LIFESIZE_NET_MARGIN * 100}% net profit; a ₱40,000 total cost gives a ₱100,000 price.
+                  </p>
+                </AField>
+              )}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>
                 <AField label="Category">
                   <ASelect value={form.category} onChange={v => set("category", v)} options={["STARWARS", "MARVEL", "DC", "OTHERS", "POPULAR"]} />

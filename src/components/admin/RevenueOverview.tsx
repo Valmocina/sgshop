@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
-  type OrderRow, type DateRangeKey, getDateRange, formatPeso, isRevenueOrder,
+  type OrderRow, type DateRangeKey, getDateRange, formatPeso, isRevenueOrder, netItemRevenue,
 } from "./revenueTypes";
 import RevenueChart, { type RevenueBucket } from "./RevenueChart";
 import RevenueByCategory, { type CategoryRevenue } from "./RevenueByCategory";
@@ -52,7 +52,7 @@ export default function RevenueOverview() {
       // Single round trip: orders + their line items, embedded via the FK relationship.
       const { data, error: err } = await supabase
         .from("orders")
-        .select("id, status, total, refunded_amount, payment_method, customer_name, created_at, archived_at, order_items(product_name, category, unit_price, quantity)")
+        .select("id, status, total, refunded_amount, payment_method, customer_name, created_at, archived_at, order_items(product_name, category, product_scale, unit_price, unit_cost, quantity)")
         .gte("created_at", range.start.toISOString())
         .lte("created_at", range.end.toISOString())
         .order("created_at", { ascending: false });
@@ -80,6 +80,26 @@ export default function RevenueOverview() {
   const netRevenue = totalRevenue - refundedAmount;
   const orderCount = revenueOrders.length;
   const avgOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
+  const lifesizeProfit = useMemo(() => {
+    let profit = 0;
+    let uncostedSales = 0;
+    let costedSales = 0;
+    let hasSales = false;
+    for (const order of revenueOrders) {
+      for (const item of order.order_items || []) {
+        if (item.product_scale !== "Lifesize") continue;
+        hasSales = true;
+        const netSales = netItemRevenue(order, item);
+        if (item.unit_cost == null) {
+          uncostedSales += netSales;
+        } else {
+          costedSales += netSales;
+          profit += netSales - item.unit_cost * item.quantity;
+        }
+      }
+    }
+    return { profit, uncostedSales, costedSales, hasSales };
+  }, [revenueOrders]);
 
   // ── Revenue over time ──
   const chartBuckets: RevenueBucket[] = useMemo(() => {
@@ -121,17 +141,22 @@ export default function RevenueOverview() {
 
   // ── Top-selling products ──
   const topProducts: TopProduct[] = useMemo(() => {
-    const map = new Map<string, { unitsSold: number; revenue: number }>();
+    const map = new Map<string, { unitsSold: number; revenue: number; profit: number; isLifesize: boolean; hasUncostedSales: boolean }>();
     for (const o of revenueOrders) {
       for (const item of o.order_items || []) {
-        const existing = map.get(item.product_name) || { unitsSold: 0, revenue: 0 };
+        const existing = map.get(item.product_name) || { unitsSold: 0, revenue: 0, profit: 0, isLifesize: false, hasUncostedSales: false };
         existing.unitsSold += item.quantity;
         existing.revenue += item.unit_price * item.quantity;
+        if (item.product_scale === "Lifesize") {
+          existing.isLifesize = true;
+          if (item.unit_cost == null) existing.hasUncostedSales = true;
+          else existing.profit += netItemRevenue(o, item) - item.unit_cost * item.quantity;
+        }
         map.set(item.product_name, existing);
       }
     }
     return Array.from(map.entries())
-      .map(([name, v]) => ({ name, ...v }))
+      .map(([name, v]) => ({ name, unitsSold: v.unitsSold, revenue: v.revenue, profit: v.isLifesize && !v.hasUncostedSales ? v.profit : null }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
   }, [revenueOrders]);
@@ -191,12 +216,22 @@ export default function RevenueOverview() {
     window.print();
   };
 
-  const summaryCards = [
+  const summaryCards: { label: string; value: string; color: string; hint?: string }[] = [
     { label: "Total Revenue", value: formatPeso(totalRevenue), color: GOLD },
     { label: "Orders", value: String(orderCount), color: GREEN },
     { label: "Average Order Value", value: formatPeso(avgOrderValue), color: "#3b82f6" },
     { label: "Refunded Amount", value: formatPeso(refundedAmount), color: YELLOW },
     { label: "Net Revenue", value: formatPeso(netRevenue), color: netRevenue >= 0 ? GREEN : RED },
+    {
+      label: "Life-size Net Profit",
+      value: !lifesizeProfit.hasSales || lifesizeProfit.costedSales === 0
+        ? "—"
+        : formatPeso(lifesizeProfit.profit),
+      color: lifesizeProfit.profit >= 0 ? GREEN : RED,
+      hint: lifesizeProfit.uncostedSales > 0
+        ? `${formatPeso(lifesizeProfit.uncostedSales)} in statue sales need costs recorded`
+        : "After refunds and recorded statue costs",
+    },
   ];
 
   const sectionStyle: React.CSSProperties = { background: SURFACE, border: `1px solid ${BORDER}`, borderRadius: 12, padding: "20px 22px", marginBottom: 20 };
@@ -243,10 +278,11 @@ export default function RevenueOverview() {
         <>
           {/* Summary cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 14, marginBottom: 20 }}>
-            {summaryCards.map(({ label, value, color }) => (
+            {summaryCards.map(({ label, value, color, hint }) => (
               <div key={label} style={{ background: SURFACE, borderRadius: 12, padding: "18px 20px", border: `1px solid ${BORDER}` }}>
                 <p style={{ ...af(12, 600), color: TEXT_MUTED, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>{label}</p>
                 <p style={{ ...af(24, 700), color }}>{value}</p>
+                {hint && <p style={{ ...af(11, 400), color: TEXT_MUTED, marginTop: 6 }}>{hint}</p>}
               </div>
             ))}
           </div>

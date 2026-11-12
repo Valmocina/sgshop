@@ -26,6 +26,7 @@ create table public.products (
   franchise text not null default 'Star Wars',
   brand text not null default 'Others',
   scale text not null default '1:6',
+  unit_cost numeric(10,2) check (unit_cost is null or unit_cost >= 0),
   condition text not null default 'Brand New',
   stock integer not null default 0,              -- always 0 for Lifesize (pre-order only)
   details text[] not null default '{}',
@@ -90,7 +91,9 @@ create table public.order_items (
   product_id bigint references public.products(id) on delete set null,
   product_name text not null,
   category text not null,
+  product_scale text check (product_scale is null or product_scale in ('1:32', '1:16', '1:8', '1:6', '1:4', '1:3', '1:2', 'Lifesize')),
   unit_price numeric(10,2) not null,
+  unit_cost numeric(10,2) check (unit_cost is null or unit_cost >= 0),
   quantity integer not null check (quantity > 0)
 );
 

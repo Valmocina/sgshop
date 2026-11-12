@@ -23,6 +23,78 @@ import { clearPendingOrder, loadPendingOrder, type PendingOrder } from "@/lib/pe
 import type { CreateOrderArgs } from "@/components/checkout/PaymentSummaryPage";
 import { authIdentifierCredentials } from "@/lib/authIdentifier";
 
+type CartItem = { product: Product; qty: number };
+
+const GUEST_CART_KEY = "sgshop:cart:guest";
+const customerCartKey = (userId: string) => `sgshop:cart:${userId}`;
+
+const readStoredCart = (key: string, products: Product[]): CartItem[] => {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) throw new Error("Saved cart is not an array.");
+
+    const productsById = new Map(products.map((product) => [product.id, product]));
+    return parsed.flatMap((entry: unknown) => {
+      if (typeof entry !== "object" || entry === null) return [];
+      const { productId, qty } = entry as Record<string, unknown>;
+      if (
+        typeof productId !== "number" ||
+        !Number.isSafeInteger(productId) ||
+        typeof qty !== "number" ||
+        !Number.isSafeInteger(qty) ||
+        qty < 1
+      ) {
+        return [];
+      }
+
+      const product = productsById.get(productId);
+      return product ? [{ product, qty }] : [];
+    });
+  } catch (error) {
+    console.error("Failed to load saved cart:", error);
+    return [];
+  }
+};
+
+const writeStoredCart = (key: string, items: CartItem[]) => {
+  try {
+    localStorage.setItem(
+      key,
+      JSON.stringify(items.map(({ product, qty }) => ({ productId: product.id, qty }))),
+    );
+    return true;
+  } catch (error) {
+    console.error("Failed to save cart in this browser:", error);
+    return false;
+  }
+};
+
+const removeStoredCart = (key: string) => {
+  try {
+    localStorage.removeItem(key);
+  } catch (error) {
+    console.error("Failed to remove saved cart:", error);
+  }
+};
+
+const mergeCarts = (accountItems: CartItem[], guestItems: CartItem[]) => {
+  const itemsByProduct = new Map<number, CartItem>();
+  for (const item of accountItems) {
+    const existing = itemsByProduct.get(item.product.id);
+    if (!existing || item.qty > existing.qty) {
+      itemsByProduct.set(item.product.id, { ...item });
+    }
+  }
+  for (const item of guestItems) {
+    const existing = itemsByProduct.get(item.product.id);
+    if (existing) existing.qty += item.qty;
+    else itemsByProduct.set(item.product.id, { ...item });
+  }
+  return [...itemsByProduct.values()];
+};
+
 export default function App() {
   // ── Supabase state ──
   const [products, setProducts] = useState<Product[]>([]);
@@ -46,6 +118,7 @@ export default function App() {
         id: p.id,
         name: p.name || "UNNAMED PRODUCT",
         price: Number(p.price) || 0,
+        unit_cost: p.unit_cost != null ? Number(p.unit_cost) : null,
         image:
           p.image ||
           "https://images.unsplash.com/photo-1587502536263-aa47cd87e898?w=500&h=500&fit=crop&auto=format",
@@ -205,20 +278,27 @@ export default function App() {
   ) => {
     const next = update(cartItemsRef.current);
     cartItemsRef.current = next;
+    const saved = writeStoredCart(
+      cartOwnerIdRef.current ? customerCartKey(cartOwnerIdRef.current) : GUEST_CART_KEY,
+      next,
+    );
     setCartItems(next);
+    return saved;
   };
 
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || products.length === 0) return;
     if (!loggedInCustomer) {
       cartOwnerIdRef.current = null;
-      updateCartItems(() => []);
+      updateCartItems(() => readStoredCart(GUEST_CART_KEY, products));
       return;
     }
-    if (products.length === 0) return;
-    if (cartOwnerIdRef.current && cartOwnerIdRef.current !== loggedInCustomer.id) {
-      updateCartItems(() => []);
-    }
+
+    const accountKey = customerCartKey(loggedInCustomer.id);
+    const accountCache = readStoredCart(accountKey, products);
+    const guestItems = readStoredCart(GUEST_CART_KEY, products);
+    cartOwnerIdRef.current = loggedInCustomer.id;
+    updateCartItems(() => accountCache);
 
     let active = true;
     const loadCart = async () => {
@@ -230,8 +310,8 @@ export default function App() {
       if (!active) return;
       if (error) {
         console.error("Failed to load customer cart:", error);
-        cartOwnerIdRef.current = loggedInCustomer.id;
-        updateCartItems(() => []);
+        const saved = updateCartItems(() => mergeCarts(accountCache, guestItems));
+        if (saved && guestItems.length > 0) removeStoredCart(GUEST_CART_KEY);
         return;
       }
 
@@ -242,38 +322,27 @@ export default function App() {
         const product = productsById.get(Number(item.product_id));
         return product ? [{ product, qty: item.quantity }] : [];
       });
-      const guestItems =
-        cartOwnerIdRef.current === null ? cartItemsRef.current : [];
-      const mergedItems = [...accountItems];
-      for (const guestItem of guestItems) {
-        const existing = mergedItems.find(
-          (item) => item.product.id === guestItem.product.id,
-        );
-        if (existing) existing.qty += guestItem.qty;
-        else mergedItems.push(guestItem);
-      }
-
-      cartOwnerIdRef.current = loggedInCustomer.id;
-      updateCartItems(() => mergedItems);
-      const guestWrites = await Promise.all(
-        guestItems.map((item) => {
-          const merged = mergedItems.find(
-            (entry) => entry.product.id === item.product.id,
-          );
-          return supabase.from("cart_items").upsert(
-            {
-              user_id: loggedInCustomer.id,
-              product_id: item.product.id,
-              quantity: merged?.qty ?? item.qty,
-            },
-            { onConflict: "user_id,product_id" },
-          );
-        }),
+      const mergedItems = mergeCarts(
+      mergeCarts(accountCache, accountItems),
+      guestItems,
       );
-      for (const result of guestWrites) {
-        if (result.error) {
-          console.error("Failed to merge guest cart into customer cart:", result.error);
-        }
+      const saved = updateCartItems(() => mergedItems);
+      if (saved && guestItems.length > 0) removeStoredCart(GUEST_CART_KEY);
+      const writes = await Promise.all(
+      mergedItems.map((item) =>
+        supabase.from("cart_items").upsert(
+          {
+            user_id: loggedInCustomer.id,
+            product_id: item.product.id,
+            quantity: item.qty,
+          },
+          { onConflict: "user_id,product_id" },
+        ),
+      ),
+      );
+      const failedWrite = writes.find((result) => result.error);
+      if (failedWrite?.error) {
+      console.error("Failed to sync customer cart:", failedWrite.error);
       }
     };
 
@@ -324,6 +393,7 @@ export default function App() {
     const payload = {
       name: data.name,
       price: data.price,
+      unit_cost: data.unit_cost ?? null,
       image: data.image,
       category: data.category,
       franchise: data.franchise,
@@ -425,7 +495,9 @@ export default function App() {
       product_id: product.id,
       product_name: product.name,
       category: product.category,
+      product_scale: product.scale,
       unit_price: product.price,
+      unit_cost: product.scale === "Lifesize" ? product.unit_cost ?? null : null,
       quantity: qty,
     });
 

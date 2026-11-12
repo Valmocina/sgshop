@@ -10,6 +10,7 @@ export type Scale = "1:32" | "1:16" | "1:8" | "1:4" | "1:3" | "1:2" | "Lifesize"
 
 export interface Product {
   id: number; name: string; price: number; image: string;
+  unit_cost?: number | null;
   category: Category; franchise: Franchise; brand: Brand;
   scale: Scale; condition: Condition; stock: number;
   details: string[]; new: boolean;

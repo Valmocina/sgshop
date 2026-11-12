@@ -6,7 +6,9 @@
 export type OrderItemRow = {
   product_name: string;
   category: string;
+  product_scale: string | null;
   unit_price: number;
+  unit_cost: number | null;
   quantity: number;
 };
 
@@ -85,4 +87,14 @@ export function formatPeso(n: number): string {
 // Only statuses in REVENUE_STATUSES count toward any revenue metric.
 export function isRevenueOrder(o: OrderRow): boolean {
   return REVENUE_STATUSES.includes(o.status);
+}
+
+export function netItemRevenue(
+  order: Pick<OrderRow, "total" | "refunded_amount">,
+  item: Pick<OrderItemRow, "unit_price" | "quantity">,
+): number {
+  const lineTotal = item.unit_price * item.quantity;
+  const refund = Math.min(Math.max(order.refunded_amount, 0), Math.max(order.total, 0));
+  const refundShare = order.total > 0 ? refund * (lineTotal / order.total) : 0;
+  return lineTotal - refundShare;
 }
