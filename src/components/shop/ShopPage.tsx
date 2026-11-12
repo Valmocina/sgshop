@@ -10,8 +10,9 @@ import { useWindowWidth } from "@/hooks/useWindowWidth";
 
 const visitedCategories = new Set<Category>(["HOME"]);
 
-export function ShopPage({ cartCount, onProductClick, onCartClick, onAccountClick, onLogout, customerLoggedIn, products, activeCategory, onCategoryChange }: {
+export function ShopPage({ cartCount, onProductClick, onAddToCart, onCartClick, onAccountClick, onLogout, customerLoggedIn, products, activeCategory, onCategoryChange }: {
   cartCount: number; onProductClick: (p: Product) => void; onCartClick: () => void; onAccountClick: () => void;
+  onAddToCart: (product: Product) => void;
   onLogout: () => void; customerLoggedIn: boolean;
   products: Product[]; activeCategory: Category; onCategoryChange: (c: Category) => void;
 }) {
@@ -114,7 +115,7 @@ export function ShopPage({ cartCount, onProductClick, onCartClick, onAccountClic
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(auto-fill, minmax(180px, 1fr))" : "repeat(auto-fill, minmax(340px, 1fr))", gap: isMobile ? 14 : 24 }}>
             {filtered.map((p) => (
               <div key={p.id} className={animateCategory ? "shop-tab-enter" : undefined}>
-                <ProductCard product={p} onClick={() => onProductClick(p)} />
+                <ProductCard product={p} onClick={() => onProductClick(p)} onAddToCart={onAddToCart} />
               </div>
             ))}
             {filtered.length === 0 && (
