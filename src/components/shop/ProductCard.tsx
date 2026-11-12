@@ -10,6 +10,7 @@ import { isPreOrder } from "@/lib/preorder";
 export function ProductCard({ product, onClick, onAddToCart }: { product: Product; onClick: () => void; onAddToCart: (product: Product) => void }) {
   const [hov, setHov] = useState(false);
   const [added, setAdded] = useState(false);
+  const [addHovered, setAddHovered] = useState(false);
   return (
     <div onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
       style={{ background: C.card, borderRadius: 12, overflow: "hidden", border: `1px solid ${hov ? C.borderLight : C.border}`, transform: hov ? "translateY(-3px)" : "none", boxShadow: hov ? `0 12px 32px rgba(0,0,0,0.5), 0 0 0 1px ${C.gold}33` : "0 2px 8px rgba(0,0,0,0.3)", transition: "all 0.22s" }}>
@@ -35,11 +36,29 @@ export function ProductCard({ product, onClick, onAddToCart }: { product: Produc
         </div>
       </button>
       <div style={{ padding: "0 16px 16px" }}>
-        <button type="button" onClick={() => {
-          onAddToCart(product);
-          setAdded(true);
-          setTimeout(() => setAdded(false), 1500);
-        }} style={{ width: "100%", background: added ? `${C.gold}22` : C.gold, border: `1px solid ${C.gold}`, borderRadius: 6, padding: "10px 12px", cursor: "pointer", ...font(12, 800, 1.2), color: added ? C.gold : "#111", transition: "all 0.15s" }}>
+        <button
+          type="button"
+          onClick={() => {
+            onAddToCart(product);
+            setAdded(true);
+            setTimeout(() => setAdded(false), 1500);
+          }}
+          onMouseEnter={() => setAddHovered(true)}
+          onMouseLeave={() => setAddHovered(false)}
+          style={{
+            width: "100%",
+            background: added ? `${C.gold}22` : addHovered ? "#f5c842" : C.gold,
+            border: `1px solid ${C.gold}`,
+            borderRadius: 6,
+            padding: "10px 12px",
+            cursor: "pointer",
+            ...font(12, 800, 1.2),
+            color: added ? C.gold : "#111",
+            transform: addHovered ? "translateY(-1px)" : "none",
+            boxShadow: addHovered ? `0 4px 12px ${C.gold}55` : "none",
+            transition: "all 0.15s",
+          }}
+        >
           {added ? "ADDED TO CART" : "ADD TO CART"}
         </button>
       </div>
