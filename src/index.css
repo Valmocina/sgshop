@@ -235,6 +235,8 @@ input[type="number"]::-webkit-outer-spin-button {
 
   body[data-admin-print="revenue"] .revenue-print-area,
   body[data-admin-print="revenue"] .revenue-print-area *,
+  body[data-admin-print="analytics"] .analytics-print-area,
+  body[data-admin-print="analytics"] .analytics-print-area *,
   body[data-admin-print="transactions"] .recent-transactions-print-area,
   body[data-admin-print="transactions"] .recent-transactions-print-area *,
   body[data-admin-print="delivered"] .admin-orders-print-area,
@@ -246,6 +248,7 @@ input[type="number"]::-webkit-outer-spin-button {
   }
 
   body[data-admin-print="revenue"] .revenue-print-area,
+  body[data-admin-print="analytics"] .analytics-print-area,
   body[data-admin-print="transactions"] .recent-transactions-print-area,
   body[data-admin-print="delivered"] .admin-orders-print-area {
     position: absolute;

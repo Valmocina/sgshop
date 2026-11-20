@@ -12,11 +12,11 @@ const labelStyle: React.CSSProperties = { ...font(12, 700, 1.5), color: C.textMu
 const focus = (e: React.FocusEvent<HTMLInputElement>) => (e.target.style.borderColor = C.gold);
 const blur = (e: React.FocusEvent<HTMLInputElement>) => (e.target.style.borderColor = C.border);
 
-export function PaymentNumberPage({ product, qty, preorder, paymentOption, guest, defaultName, defaultEmail, defaultPhone, onNext, onBack }: {
+export function PaymentNumberPage({ product, qty, preorder, paymentOption, guest, defaultName, defaultEmail, defaultPhone, defaultRegion, onNext, onBack }: {
   product: Product; qty: number;
   preorder: boolean; paymentOption: PaymentOption;
   guest: boolean;                       // not signed in
-  defaultName: string; defaultEmail: string; defaultPhone: string;
+  defaultName: string; defaultEmail: string; defaultPhone: string; defaultRegion: string;
   onNext: (method: PayMethod, contact: ContactInfo) => void;
   onBack: () => void;
 }) {
@@ -24,6 +24,7 @@ export function PaymentNumberPage({ product, qty, preorder, paymentOption, guest
   const [phone, setPhone] = useState(defaultPhone.replace(/^\+?63/, "").replace(/^0/, ""));
   const [name, setName] = useState(defaultName);
   const [email, setEmail] = useState(defaultEmail);
+  const [region, setRegion] = useState(defaultRegion);
   const [error, setError] = useState("");
 
   // A pre-order is a long-running order we have to follow up on, so we need real contact details.
@@ -40,7 +41,7 @@ export function PaymentNumberPage({ product, qty, preorder, paymentOption, guest
     if (askIdentity && !name.trim()) { setError("Please enter your full name."); return; }
     if (askIdentity && !/^\S+@\S+\.\S+$/.test(email.trim())) { setError("Please enter a valid email address."); return; }
     setError("");
-    onNext(method, { name: name.trim(), email: email.trim(), phone: digits });
+    onNext(method, { name: name.trim(), email: email.trim(), phone: digits, region: region.trim() });
   };
 
   return (
@@ -99,6 +100,12 @@ export function PaymentNumberPage({ product, qty, preorder, paymentOption, guest
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" style={{ ...fieldStyle, marginBottom: 14 }} onFocus={focus} onBlur={blur} />
               </>
             )}
+
+            <label style={labelStyle}>Province / region (optional)</label>
+            <input value={region} onChange={e => setRegion(e.target.value.slice(0, 80))} placeholder="e.g. Cebu" maxLength={80} style={{ ...fieldStyle, marginBottom: 14 }} onFocus={focus} onBlur={blur} />
+            <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 12, color: C.textDim, marginTop: -8, marginBottom: 18 }}>
+              Used for order coordination and aggregated regional sales analysis.
+            </p>
 
             <label style={labelStyle}>Mobile number{preorder ? "" : " (optional)"}</label>
             <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 12, color: C.textDim, marginBottom: 10 }}>

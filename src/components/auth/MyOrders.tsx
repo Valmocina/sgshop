@@ -92,7 +92,7 @@ function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => v
   };
 
   const handleCancelOrder = async () => {
-    if (cancelling || !window.confirm("Cancel this order? Any amount already paid will remain recorded and will not be refunded automatically.")) return;
+    if (cancelling || !window.confirm("Cancel this order? Any amount already paid is non-refundable.")) return;
     setCancelling(true);
     setScheduleMessage(null);
     try {
@@ -114,7 +114,7 @@ function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => v
         setScheduleMessage({ text: `Unable to cancel order: ${error?.message ?? "This order can no longer be cancelled."}`, ok: false });
         return;
       }
-      setScheduleMessage({ text: "Order cancelled. Any payment already received remains recorded; no automatic refund was made.", ok: true });
+      setScheduleMessage({ text: "Order cancelled. Any payment already received is non-refundable and remains recorded.", ok: true });
       onReload?.();
     } catch (error) {
       setScheduleMessage({ text: `Unable to cancel order: ${error instanceof Error ? error.message : "Unexpected error."}`, ok: false });
@@ -253,7 +253,7 @@ function OrderCard({ order, onReload }: { order: OrderRecord; onReload?: () => v
       {order.status === "cancelled" && (
         <p style={{ ...body, color: "#ef4444", marginTop: 12 }}>
           {cancelledByCustomer ? "You cancelled this order." : order.cancellation_reason === "admin_rejected" ? "This pre-order was rejected by the shop." : order.cancellation_reason === "admin_cancelled" ? "This order was cancelled by the shop." : "This order was cancelled before payment was completed."}
-          {" "}Any amount already paid remains recorded; refunds are handled separately.
+          {" "}Any amount already paid is non-refundable and remains recorded.
         </p>
       )}
 

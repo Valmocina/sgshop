@@ -58,6 +58,7 @@ create table public.orders (
   customer_name text not null default 'Guest',
   customer_email text,
   customer_phone text,
+  customer_region text check (customer_region is null or length(customer_region) <= 80),
   status text not null default 'pending'
     check (status in ('pending','paid','deposit_paid','failed','cancelled','refunded')),
   cancellation_reason text

@@ -1,6 +1,6 @@
 export type Page = "auth" | "shop" | "cart" | "product" | "lifesize" | "payment-number" | "payment-summary" | "account";
 export type AuthTab = "signin" | "signup";
-export type AdminTab = "dashboard" | "products" | "settings" | "orders" | "revenue" | "stats";
+export type AdminTab = "dashboard" | "products" | "settings" | "orders" | "revenue" | "analytics" | "stats";
 export type Category = "HOME" | "ALL" | "POPULAR" | "STARWARS" | "MARVEL" | "DC" | "OTHERS";
 export type Condition = "Brand New" | "Back in Box" | "Mint in Box" | "Loose No Box";
 export type Franchise = "Star Wars" | "Marvel" | "DC";
@@ -54,6 +54,7 @@ export interface OrderRecord {
   customer_name: string;
   customer_email: string | null;
   customer_phone: string | null;
+  customer_region?: string | null;
   fulfillment_status: FulfillmentStatus | null;
   est_arrival: string | null;
   supplier_ref: string | null;
@@ -66,5 +67,5 @@ export interface OrderRecord {
   review_status?: ReviewStatus | null;
   order_items: { product_name: string; category: string; unit_price: number; quantity: number }[];
 }
-export interface ContactInfo { name: string; email: string; phone: string }
+export interface ContactInfo { name: string; email: string; phone: string; region: string }
 export type PayMethod = "gcash" | "maya";

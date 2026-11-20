@@ -156,6 +156,12 @@ export function PaymentSummaryPage({ product, qty, method, preorder, paymentOpti
               </div>
             )}
 
+            <div style={{ margin: "0 32px 16px", background: "rgba(239, 68, 68, 0.06)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: 8, padding: "10px 16px" }}>
+              <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+                <strong style={{ color: "#ef4444" }}>No refunds:</strong> All sales are final. Payments and pre-order deposits are non-refundable.
+              </p>
+            </div>
+
             {payError && (
               <div style={{ margin: "0 32px 16px", background: "#fee2e2", border: "1px solid #fca5a5", borderRadius: 8, padding: "12px 16px" }}>
                 <p style={{ fontFamily: "'Barlow', sans-serif", fontSize: 13, color: "#dc2626", lineHeight: 1.5 }}><strong>Payment Error:</strong> {payError}</p>

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import {
-  type OrderRow, type DateRangeKey, getDateRange, formatPeso, isRevenueOrder, netItemRevenue,
+  type OrderRow, type DateRangeKey, getDateRange, formatPeso, isRevenueOrder, lineRevenue,
 } from "./revenueTypes";
 import RevenueChart, { type RevenueBucket } from "./RevenueChart";
 import RevenueByCategory, { type CategoryRevenue } from "./RevenueByCategory";
@@ -16,7 +16,6 @@ const TEXT_MUTED = "#666";
 const GOLD = "#F5A623";
 const GOLD_DARK = "#D4891A";
 const GREEN = "#22c55e";
-const YELLOW = "#eab308";
 const RED = "#ef4444";
 
 const af = (size: number, weight = 600): React.CSSProperties => ({
@@ -52,7 +51,7 @@ export default function RevenueOverview() {
       // Single round trip: orders + their line items, embedded via the FK relationship.
       const { data, error: err } = await supabase
         .from("orders")
-        .select("id, status, total, refunded_amount, payment_method, customer_name, created_at, archived_at, order_items(product_name, category, product_scale, unit_price, unit_cost, quantity)")
+        .select("id, status, total, payment_method, customer_name, created_at, archived_at, order_items(product_name, category, product_scale, unit_price, unit_cost, quantity)")
         .gte("created_at", range.start.toISOString())
         .lte("created_at", range.end.toISOString())
         .order("created_at", { ascending: false });
@@ -76,8 +75,6 @@ export default function RevenueOverview() {
   const revenueOrders = useMemo(() => orders.filter(isRevenueOrder), [orders]);
 
   const totalRevenue = useMemo(() => revenueOrders.reduce((s, o) => s + o.total, 0), [revenueOrders]);
-  const refundedAmount = useMemo(() => revenueOrders.reduce((s, o) => s + o.refunded_amount, 0), [revenueOrders]);
-  const netRevenue = totalRevenue - refundedAmount;
   const orderCount = revenueOrders.length;
   const avgOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
   const lifesizeProfit = useMemo(() => {
@@ -89,12 +86,12 @@ export default function RevenueOverview() {
       for (const item of order.order_items || []) {
         if (item.product_scale !== "Lifesize") continue;
         hasSales = true;
-        const netSales = netItemRevenue(order, item);
+        const itemSales = lineRevenue(item);
         if (item.unit_cost == null) {
-          uncostedSales += netSales;
+          uncostedSales += itemSales;
         } else {
-          costedSales += netSales;
-          profit += netSales - item.unit_cost * item.quantity;
+          costedSales += itemSales;
+          profit += itemSales - item.unit_cost * item.quantity;
         }
       }
     }
@@ -150,7 +147,7 @@ export default function RevenueOverview() {
         if (item.product_scale === "Lifesize") {
           existing.isLifesize = true;
           if (item.unit_cost == null) existing.hasUncostedSales = true;
-          else existing.profit += netItemRevenue(o, item) - item.unit_cost * item.quantity;
+          else existing.profit += lineRevenue(item) - item.unit_cost * item.quantity;
         }
         map.set(item.product_name, existing);
       }
@@ -163,13 +160,12 @@ export default function RevenueOverview() {
 
   // ── Export CSV (full period, all statuses) ──
   const exportCsv = () => {
-    const header = ["Order ID", "Customer", "Date", "Amount", "Refunded", "Status", "Payment Method"];
+    const header = ["Order ID", "Customer", "Date", "Amount", "Status", "Payment Method"];
     const rows = orders.map(o => [
       o.id,
       o.customer_name,
       new Date(o.created_at).toISOString(),
       o.total.toFixed(2),
-      o.refunded_amount.toFixed(2),
       o.status,
       o.payment_method || "",
     ]);
@@ -220,8 +216,6 @@ export default function RevenueOverview() {
     { label: "Total Revenue", value: formatPeso(totalRevenue), color: GOLD },
     { label: "Orders", value: String(orderCount), color: GREEN },
     { label: "Average Order Value", value: formatPeso(avgOrderValue), color: "#3b82f6" },
-    { label: "Refunded Amount", value: formatPeso(refundedAmount), color: YELLOW },
-    { label: "Net Revenue", value: formatPeso(netRevenue), color: netRevenue >= 0 ? GREEN : RED },
     {
       label: "Life-size Net Profit",
       value: !lifesizeProfit.hasSales || lifesizeProfit.costedSales === 0
@@ -230,7 +224,7 @@ export default function RevenueOverview() {
       color: lifesizeProfit.profit >= 0 ? GREEN : RED,
       hint: lifesizeProfit.uncostedSales > 0
         ? `${formatPeso(lifesizeProfit.uncostedSales)} in statue sales need costs recorded`
-        : "After refunds and recorded statue costs",
+        : "After recorded statue costs",
     },
   ];
 

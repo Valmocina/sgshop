@@ -105,6 +105,8 @@ export function ProductFormModal({ product, onSave, onSaveAndAddAnother, onCance
       e.unit_cost = "Enter the total cost per statue to calculate its selling price";
     } else if (lifesize && numericUnitCost > MAX_LIFESIZE_UNIT_COST) {
       e.unit_cost = "Total cost is too high for the product price limit";
+    } else if (!lifesize && form.unit_cost !== "" && (!Number.isFinite(numericUnitCost) || numericUnitCost < 0)) {
+      e.unit_cost = "Enter a valid product cost";
     }
     if (!lifesize && (!form.price || isNaN(Number(form.price)) || Number(form.price) <= 0)) e.price = "Valid price required";
     if (!preorder && (!form.stock || isNaN(Number(form.stock)) || Number(form.stock) < 0)) e.stock = "Valid stock required";
@@ -126,7 +128,7 @@ export function ProductFormModal({ product, onSave, onSaveAndAddAnother, onCance
     scale: form.scale as any,
     condition: form.condition as any,
     price: lifesize ? priceForLifesizeMargin(numericUnitCost) : Number(form.price),
-    unit_cost: lifesize ? numericUnitCost : null,
+    unit_cost: form.unit_cost === "" ? null : numericUnitCost,
     stock: preorder ? 0 : Number(form.stock),
     image: form.image || "https://images.unsplash.com/photo-1587502536263-aa47cd87e898?w=500&h=500&fit=crop&auto=format",
     is_available: form.is_available,
@@ -211,6 +213,12 @@ export function ProductFormModal({ product, onSave, onSaveAndAddAnother, onCance
                   <p style={{ ...af(11, 400), color: A.textMuted, marginTop: 4 }}>
                     Include all per-statue costs. The selling price is calculated to target {LIFESIZE_NET_MARGIN * 100}% net profit; a ₱40,000 total cost gives a ₱100,000 price.
                   </p>
+                </AField>
+              )}
+              {!lifesize && (
+                <AField label="Unit Cost (₱) — optional">
+                  <AInput value={form.unit_cost} onChange={v => set("unit_cost", v)} placeholder="All-in cost per item" type="number" />
+                  {errors.unit_cost && <p style={{ ...af(11, 500), color: A.red, marginTop: 4 }}>{errors.unit_cost}</p>}
                 </AField>
               )}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 12px" }}>

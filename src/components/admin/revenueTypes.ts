@@ -14,9 +14,8 @@ export type OrderItemRow = {
 
 export type OrderRow = {
   id: string;
-  status: string; // "pending" | "paid" | "failed" | "cancelled" | "refunded"
+  status: string;
   total: number;
-  refunded_amount: number;
   payment_method: string | null;
   customer_name: string;
   created_at: string;
@@ -25,7 +24,7 @@ export type OrderRow = {
 };
 
 // Orders in these statuses count as real, successful revenue.
-export const REVENUE_STATUSES = ["paid", "refunded"];
+export const REVENUE_STATUSES = ["paid"];
 
 export type DateRangeKey = "today" | "week" | "month" | "lastMonth" | "year" | "custom";
 
@@ -89,12 +88,6 @@ export function isRevenueOrder(o: OrderRow): boolean {
   return REVENUE_STATUSES.includes(o.status);
 }
 
-export function netItemRevenue(
-  order: Pick<OrderRow, "total" | "refunded_amount">,
-  item: Pick<OrderItemRow, "unit_price" | "quantity">,
-): number {
-  const lineTotal = item.unit_price * item.quantity;
-  const refund = Math.min(Math.max(order.refunded_amount, 0), Math.max(order.total, 0));
-  const refundShare = order.total > 0 ? refund * (lineTotal / order.total) : 0;
-  return lineTotal - refundShare;
+export function lineRevenue(item: Pick<OrderItemRow, "unit_price" | "quantity">): number {
+  return item.unit_price * item.quantity;
 }

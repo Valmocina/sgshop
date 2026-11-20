@@ -125,7 +125,7 @@ export function MadeToOrderProduct({ product, onCheckout }: {
           <label style={{ display: "flex", gap: 12, alignItems: "flex-start", cursor: "pointer", marginBottom: 18 }}>
             <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} style={{ marginTop: 3, width: 16, height: 16, accentColor: C.gold, flexShrink: 0 }} />
             <span style={body(13)}>
-              I understand this is a <strong style={{ color: C.text }}>strict overseas pre-order</strong> with international production. Cancellations, modifications, or refunds are strictly restricted once overseas procurement is finalized.
+              I understand this is a <strong style={{ color: C.text }}>strict overseas pre-order</strong> with international production. All payments, including deposits, are non-refundable. Cancellations and modifications are not accepted once overseas procurement is finalized.
             </span>
           </label>
 

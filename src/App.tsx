@@ -354,7 +354,7 @@ export default function App() {
 
   const [confirmedOrder, setConfirmedOrder] = useState<PendingOrder | null>(null);
   const [orderConfirmed, setOrderConfirmed] = useState(false);
-  const [contact, setContact] = useState<ContactInfo>({ name: "", email: "", phone: "" });
+  const [contact, setContact] = useState<ContactInfo>({ name: "", email: "", phone: "", region: "" });
   const [authForCheckout, setAuthForCheckout] = useState(false);
   // Read once on load: after a PayMongo redirect this is the order we're coming back to.
   const [returnOrder] = useState<PendingOrder | null>(() => loadPendingOrder());
@@ -474,6 +474,7 @@ export default function App() {
         customer_name: customer?.name || contact.name || "Customer",
         customer_email: customer?.email || contact.email || null,
         customer_phone: contact.phone ? "+63" + contact.phone : customer?.phone || null,
+        customer_region: contact.region.trim() || null,
         status: "pending",
         total: lineTotal(product, qty),
         amount_due_now: dueNow(product, qty, option),
@@ -497,7 +498,7 @@ export default function App() {
       category: product.category,
       product_scale: product.scale,
       unit_price: product.price,
-      unit_cost: product.scale === "Lifesize" ? product.unit_cost ?? null : null,
+      unit_cost: product.unit_cost ?? null,
       quantity: qty,
     });
 
@@ -863,6 +864,7 @@ if (page === "shop")
         defaultName={loggedInCustomer?.name ?? ""}
         defaultEmail={loggedInCustomer?.email ?? ""}
         defaultPhone={loggedInCustomer?.phone ?? ""}
+        defaultRegion={contact.region}
         onNext={(m, c) => {
           setPayMethod(m);
           setContact(c);

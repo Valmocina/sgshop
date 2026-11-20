@@ -261,7 +261,7 @@ function OrderCard({ order, onSave, busy }: {
             )}
             {canAdminCancel && (
               <button className="admin-order-button" disabled={busy} onClick={() => {
-                if (window.confirm("Cancel this order? Any payment already received will remain recorded and will not be refunded automatically."))
+                if (window.confirm("Cancel this order? Any payment already received is non-refundable."))
                   onSave(order.id, { status: "cancelled", cancellation_reason: "admin_cancelled", delivery_date: null, delivery_time_slot: null }, "Order cancelled by admin");
               }}
                 style={{ padding: "9px 16px", background: `${A.red}18`, border: `1px solid ${A.red}55`, borderRadius: 8, ...af(13, 600), color: A.red, cursor: busy ? "wait" : "pointer" }}>
